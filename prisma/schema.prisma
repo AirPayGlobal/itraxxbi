@@ -1,0 +1,733 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// Authentication & Users
+// ============================================
+
+model User {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  name           String
+  password       String
+  role           UserRole  @default(STAFF)
+  phone          String?
+  avatar         String?
+  department     String?
+  jobTitle       String?
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  assignedTasks    Task[]           @relation("AssignedTo")
+  createdTasks     Task[]           @relation("CreatedBy")
+  jobCards         JobCard[]        @relation("TechnicianJobs")
+  createdJobCards  JobCard[]        @relation("CreatedByUser")
+  leaveRequests    LeaveRequest[]
+  approvedLeaves   LeaveRequest[]   @relation("ApprovedBy")
+  performanceKPIs  PerformanceKPI[]
+  documents        Document[]
+  notifications    Notification[]
+  activityLogs     ActivityLog[]
+  comments         Comment[]
+  assetAssignments AssetAssignment[]
+  employee         Employee?
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  TECHNICIAN
+  STAFF
+  VIEWER
+}
+
+// ============================================
+// Module 1: Task & Project Management
+// ============================================
+
+model Task {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  status      TaskStatus @default(TODO)
+  priority    Priority   @default(MEDIUM)
+  dueDate     DateTime?
+  startDate   DateTime?
+  completedAt DateTime?
+  isRecurring Boolean    @default(false)
+  recurPattern String?
+
+  // Relations
+  assigneeId  String?
+  assignee    User?      @relation("AssignedTo", fields: [assigneeId], references: [id])
+  createdById String
+  createdBy   User       @relation("CreatedBy", fields: [createdById], references: [id])
+  projectId   String?
+  project     Project?   @relation(fields: [projectId], references: [id])
+  parentId    String?
+  parent      Task?      @relation("SubTasks", fields: [parentId], references: [id])
+  subtasks    Task[]     @relation("SubTasks")
+  comments    Comment[]
+  attachments Attachment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("tasks")
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  status      ProjectStatus @default(ACTIVE)
+  startDate   DateTime?
+  endDate     DateTime?
+  tasks       Task[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("projects")
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  REVIEW
+  DONE
+  CANCELLED
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  ARCHIVED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// ============================================
+// Module 2: Job Card Management
+// ============================================
+
+model JobCard {
+  id             String       @id @default(cuid())
+  jobNumber      String       @unique
+  title          String
+  description    String?
+  status         JobStatus    @default(OPEN)
+  priority       Priority     @default(MEDIUM)
+  jobType        JobType      @default(INSTALLATION)
+  scheduledDate  DateTime?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  estimatedHours Float?
+  actualHours    Float?
+  notes          String?
+  location       String?
+  gpsLatitude    Float?
+  gpsLongitude   Float?
+
+  // Relations
+  technicianId   String?
+  technician     User?        @relation("TechnicianJobs", fields: [technicianId], references: [id])
+  createdById    String
+  createdBy      User         @relation("CreatedByUser", fields: [createdById], references: [id])
+  customerId     String?
+  customer       Customer?    @relation(fields: [customerId], references: [id])
+  vehicleId      String?
+  vehicle        Vehicle?     @relation(fields: [vehicleId], references: [id])
+  invoice        Invoice?
+  parts          JobCardPart[]
+  attachments    Attachment[]
+  comments       Comment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("job_cards")
+}
+
+model JobCardPart {
+  id         String  @id @default(cuid())
+  quantity   Int
+  unitPrice  Float
+  jobCardId  String
+  jobCard    JobCard @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  assetId    String
+  asset      Asset   @relation(fields: [assetId], references: [id])
+
+  @@map("job_card_parts")
+}
+
+enum JobStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  INVOICED
+  CANCELLED
+}
+
+enum JobType {
+  INSTALLATION
+  MAINTENANCE
+  REPAIR
+  INSPECTION
+  REMOVAL
+  OTHER
+}
+
+// ============================================
+// Module 3: Customer & Client CRM
+// ============================================
+
+model Customer {
+  id            String   @id @default(cuid())
+  name          String
+  company       String?
+  email         String?
+  phone         String?
+  address       String?
+  city          String?
+  country       String?  @default("Namibia")
+  accountNumber String?  @unique
+  status        CustomerStatus @default(ACTIVE)
+  notes         String?
+  contractStart DateTime?
+  contractEnd   DateTime?
+
+  // Relations
+  vehicles      Vehicle[]
+  jobCards       JobCard[]
+  invoices       Invoice[]
+  communications Communication[]
+  documents      Document[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("customers")
+}
+
+model Vehicle {
+  id                String   @id @default(cuid())
+  registrationNumber String  @unique
+  make              String
+  model             String
+  year              Int?
+  color             String?
+  vin               String?  @unique
+  trackerDeviceId   String?
+  trackerStatus     TrackerStatus @default(NOT_INSTALLED)
+  lastServiceDate   DateTime?
+  nextServiceDate   DateTime?
+
+  // Relations
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+  jobCards    JobCard[]
+  assets      AssetAssignment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("vehicles")
+}
+
+model Communication {
+  id         String            @id @default(cuid())
+  type       CommunicationType
+  subject    String?
+  content    String
+  direction  Direction         @default(OUTBOUND)
+  customerId String
+  customer   Customer          @relation(fields: [customerId], references: [id])
+  createdAt  DateTime          @default(now())
+
+  @@map("communications")
+}
+
+enum CustomerStatus {
+  PROSPECT
+  ACTIVE
+  INACTIVE
+  CHURNED
+}
+
+enum TrackerStatus {
+  NOT_INSTALLED
+  ACTIVE
+  INACTIVE
+  FAULTY
+}
+
+enum CommunicationType {
+  CALL
+  EMAIL
+  WHATSAPP
+  SMS
+  MEETING
+  NOTE
+}
+
+enum Direction {
+  INBOUND
+  OUTBOUND
+}
+
+// ============================================
+// Module 4: Staff Performance Tracking
+// ============================================
+
+model PerformanceKPI {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  period          String
+  jobsCompleted   Int      @default(0)
+  avgResponseTime Float?
+  customerRating  Float?
+  tasksCompleted  Int      @default(0)
+  attendanceRate  Float?
+  punctualityRate Float?
+  overallScore    Float?
+  goals           String?
+  managerNotes    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, period])
+  @@map("performance_kpis")
+}
+
+// ============================================
+// Module 5: HR & Leave Management
+// ============================================
+
+model Employee {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id])
+  employeeNumber    String   @unique
+  dateOfBirth       DateTime?
+  startDate         DateTime
+  endDate           DateTime?
+  contractType      ContractType @default(PERMANENT)
+  salary            Float?
+  bankName          String?
+  bankAccount       String?
+  taxNumber         String?
+  emergencyContact  String?
+  emergencyPhone    String?
+  annualLeaveBalance  Float  @default(20)
+  sickLeaveBalance    Float  @default(12)
+  compassionateLeaveBalance Float @default(5)
+
+  // Relations
+  trainings      Training[]
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@map("employees")
+}
+
+model LeaveRequest {
+  id          String      @id @default(cuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id])
+  leaveType   LeaveType
+  startDate   DateTime
+  endDate     DateTime
+  days        Float
+  reason      String?
+  status      LeaveStatus @default(PENDING)
+  approvedById String?
+  approvedBy  User?       @relation("ApprovedBy", fields: [approvedById], references: [id])
+  approvedAt  DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("leave_requests")
+}
+
+model Training {
+  id            String    @id @default(cuid())
+  employeeId    String
+  employee      Employee  @relation(fields: [employeeId], references: [id])
+  name          String
+  provider      String?
+  certNumber    String?
+  completedDate DateTime?
+  expiryDate    DateTime?
+  status        TrainingStatus @default(PLANNED)
+  createdAt     DateTime  @default(now())
+
+  @@map("trainings")
+}
+
+enum ContractType {
+  PERMANENT
+  FIXED_TERM
+  PART_TIME
+  CONTRACTOR
+}
+
+enum LeaveType {
+  ANNUAL
+  SICK
+  COMPASSIONATE
+  MATERNITY
+  PATERNITY
+  UNPAID
+  STUDY
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum TrainingStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  EXPIRED
+}
+
+// ============================================
+// Module 6: Document Management
+// ============================================
+
+model Document {
+  id          String       @id @default(cuid())
+  name        String
+  description String?
+  fileName    String
+  fileUrl     String
+  fileSize    Int?
+  mimeType    String?
+  category    DocCategory  @default(GENERAL)
+  version     Int          @default(1)
+  expiryDate  DateTime?
+  accessLevel DocAccess    @default(INTERNAL)
+
+  // Relations
+  uploadedById String
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  customerId   String?
+  customer     Customer? @relation(fields: [customerId], references: [id])
+  folderId     String?
+  folder       Folder?   @relation(fields: [folderId], references: [id])
+  versions     DocumentVersion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("documents")
+}
+
+model DocumentVersion {
+  id         String   @id @default(cuid())
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  version    Int
+  fileName   String
+  fileUrl    String
+  changeNote String?
+  createdAt  DateTime @default(now())
+
+  @@map("document_versions")
+}
+
+model Folder {
+  id          String   @id @default(cuid())
+  name        String
+  parentId    String?
+  parent      Folder?  @relation("SubFolders", fields: [parentId], references: [id])
+  subfolders  Folder[] @relation("SubFolders")
+  documents   Document[]
+  createdAt   DateTime @default(now())
+
+  @@map("folders")
+}
+
+enum DocCategory {
+  CONTRACT
+  CERTIFICATE
+  REGISTRATION
+  COMPLIANCE
+  SOP
+  INVOICE
+  REPORT
+  GENERAL
+}
+
+enum DocAccess {
+  PUBLIC
+  INTERNAL
+  RESTRICTED
+  CONFIDENTIAL
+}
+
+// ============================================
+// Module 7: Inventory & Asset Tracking
+// ============================================
+
+model Asset {
+  id              String      @id @default(cuid())
+  name            String
+  assetNumber     String      @unique
+  serialNumber    String?
+  category        AssetCategory
+  status          AssetStatus @default(AVAILABLE)
+  purchaseDate    DateTime?
+  purchasePrice   Float?
+  currentValue    Float?
+  depreciationRate Float?
+  location        String?
+  barcode         String?     @unique
+  quantity        Int         @default(1)
+  minStockLevel   Int?
+  notes           String?
+
+  // Relations
+  assignments  AssetAssignment[]
+  jobCardParts JobCardPart[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("assets")
+}
+
+model AssetAssignment {
+  id          String   @id @default(cuid())
+  assetId     String
+  asset       Asset    @relation(fields: [assetId], references: [id])
+  assignedToId String?
+  assignedTo  User?    @relation(fields: [assignedToId], references: [id])
+  vehicleId   String?
+  vehicle     Vehicle? @relation(fields: [vehicleId], references: [id])
+  assignedAt  DateTime @default(now())
+  returnedAt  DateTime?
+  notes       String?
+
+  @@map("asset_assignments")
+}
+
+enum AssetCategory {
+  TRACKING_DEVICE
+  VEHICLE
+  TOOL
+  SPARE_PART
+  OFFICE_EQUIPMENT
+  IT_EQUIPMENT
+  OTHER
+}
+
+enum AssetStatus {
+  AVAILABLE
+  ASSIGNED
+  IN_USE
+  MAINTENANCE
+  RETIRED
+  LOST
+}
+
+// ============================================
+// Module 8: Financial Reporting
+// ============================================
+
+model Invoice {
+  id           String        @id @default(cuid())
+  invoiceNumber String       @unique
+  customerId   String
+  customer     Customer      @relation(fields: [customerId], references: [id])
+  jobCardId    String?       @unique
+  jobCard      JobCard?      @relation(fields: [jobCardId], references: [id])
+  subtotal     Float
+  tax          Float         @default(0)
+  total        Float
+  status       InvoiceStatus @default(DRAFT)
+  issuedDate   DateTime?
+  dueDate      DateTime?
+  paidDate     DateTime?
+  notes        String?
+  items        InvoiceItem[]
+  payments     Payment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Float
+  unitPrice   Float
+  total       Float
+
+  @@map("invoice_items")
+}
+
+model Payment {
+  id          String        @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice       @relation(fields: [invoiceId], references: [id])
+  amount      Float
+  method      PaymentMethod
+  reference   String?
+  paidAt      DateTime      @default(now())
+
+  @@map("payments")
+}
+
+model Expense {
+  id          String          @id @default(cuid())
+  description String
+  amount      Float
+  category    ExpenseCategory
+  date        DateTime
+  vendor      String?
+  receipt     String?
+  approved    Boolean         @default(false)
+  notes       String?
+  createdAt   DateTime        @default(now())
+
+  @@map("expenses")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+  PARTIAL
+}
+
+enum PaymentMethod {
+  BANK_TRANSFER
+  CASH
+  CARD
+  CHEQUE
+  MOBILE_PAYMENT
+  OTHER
+}
+
+enum ExpenseCategory {
+  FUEL
+  MAINTENANCE
+  SALARY
+  RENT
+  UTILITIES
+  EQUIPMENT
+  TRAVEL
+  MARKETING
+  INSURANCE
+  OTHER
+}
+
+// ============================================
+// Shared / Cross-Module
+// ============================================
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  taskId    String?
+  task      Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  jobCardId String?
+  jobCard   JobCard? @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@map("comments")
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  fileName  String
+  fileUrl   String
+  fileSize  Int?
+  mimeType  String?
+  taskId    String?
+  task      Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  jobCardId String?
+  jobCard   JobCard? @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@map("attachments")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id])
+  title     String
+  message   String
+  type      NotificationType @default(INFO)
+  channel   NotificationChannel @default(APP)
+  isRead    Boolean          @default(false)
+  link      String?
+  createdAt DateTime         @default(now())
+
+  @@map("notifications")
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String
+  details   String?
+  createdAt DateTime @default(now())
+
+  @@map("activity_logs")
+}
+
+enum NotificationType {
+  INFO
+  WARNING
+  ERROR
+  SUCCESS
+  TASK
+  JOB
+  LEAVE
+  DOCUMENT
+  FINANCE
+}
+
+enum NotificationChannel {
+  APP
+  EMAIL
+  WHATSAPP
+  SMS
+}
