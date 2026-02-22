@@ -6,6 +6,7 @@ import {
   Users,
   DollarSign,
   Clock,
+  ArrowRight,
 } from "lucide-react";
 import {
   BarChart,
@@ -16,7 +17,9 @@ import {
   Tooltip,
   LineChart,
   Line,
+  ResponsiveContainer,
 } from "recharts";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
@@ -117,6 +120,7 @@ export default function DashboardPage() {
       {/* KPI Cards */}
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
+          index={0}
           title="Active Job Cards"
           value="24"
           change={12}
@@ -125,6 +129,7 @@ export default function DashboardPage() {
           color="bg-blue-100"
         />
         <KpiCard
+          index={1}
           title="Open Tasks"
           value="47"
           change={-5}
@@ -133,6 +138,7 @@ export default function DashboardPage() {
           color="bg-purple-100"
         />
         <KpiCard
+          index={2}
           title="Active Customers"
           value="156"
           change={8}
@@ -141,6 +147,7 @@ export default function DashboardPage() {
           color="bg-emerald-100"
         />
         <KpiCard
+          index={3}
           title="Monthly Revenue"
           value="$48,250"
           change={15}
@@ -152,7 +159,7 @@ export default function DashboardPage() {
 
       {/* Charts row */}
       <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <StatsChart title="Job Cards by Status">
+        <StatsChart title="Job Cards by Status" subtitle="Current period" index={0}>
           <BarChart data={jobCardsByStatus}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
             <XAxis
@@ -178,7 +185,7 @@ export default function DashboardPage() {
           </BarChart>
         </StatsChart>
 
-        <StatsChart title="Revenue Trend">
+        <StatsChart title="Revenue Trend" subtitle="Last 6 months" index={1}>
           <LineChart data={revenueTrend}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
             <XAxis
@@ -221,20 +228,34 @@ export default function DashboardPage() {
         <ActivityFeed />
 
         {/* Upcoming Tasks */}
-        <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-6 py-4">
-            <h3 className="text-lg font-semibold text-slate-900">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.48, ease: "easeOut" }}
+          className="rounded-xl border border-slate-200 bg-white shadow-sm"
+        >
+          <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+            <h3 className="text-base font-semibold text-slate-900">
               Upcoming Tasks
             </h3>
+            <a
+              href="/tasks"
+              className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700"
+            >
+              View all <ArrowRight className="h-3 w-3" />
+            </a>
           </div>
           <div className="divide-y divide-slate-100">
-            {upcomingTasks.map((task) => (
-              <div
+            {upcomingTasks.map((task, i) => (
+              <motion.div
                 key={task.id}
-                className="flex items-center gap-3 px-6 py-3.5"
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.25, delay: 0.52 + i * 0.04 }}
+                className="flex items-center gap-3 px-6 py-3"
               >
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-50">
-                  <Clock className="h-4 w-4 text-slate-400" />
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100">
+                  <Clock className="h-3.5 w-3.5 text-slate-400" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm text-slate-700">
@@ -246,16 +267,16 @@ export default function DashboardPage() {
                 </div>
                 <span
                   className={cn(
-                    "shrink-0 rounded-full px-2 py-0.5 text-xs font-medium capitalize",
+                    "shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold capitalize",
                     priorityStyles[task.priority]
                   )}
                 >
                   {task.priority}
                 </span>
-              </div>
+              </motion.div>
             ))}
           </div>
-        </div>
+        </motion.div>
       </div>
     </div>
   );

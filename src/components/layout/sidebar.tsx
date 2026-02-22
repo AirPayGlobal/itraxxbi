@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import {
   Home,
@@ -18,6 +18,7 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  Search,
 } from "lucide-react";
 
 const navigationItems = [
@@ -37,15 +38,14 @@ const navigationItems = [
 interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
+  onOpenCommand?: () => void;
 }
 
-export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, onOpenCommand }: SidebarProps) {
   const pathname = usePathname();
 
   const isActive = (href: string) => {
-    if (href === "/") {
-      return pathname === "/";
-    }
+    if (href === "/") return pathname === "/";
     return pathname.startsWith(href);
   };
 
@@ -57,9 +57,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       )}
     >
       {/* Brand / Logo */}
-      <div className="flex h-16 items-center border-b border-slate-700 px-4">
-        <Link href="/" className="flex items-center gap-2 overflow-hidden">
-          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-blue-600 font-bold text-white text-sm">
+      <div className="flex h-16 items-center border-b border-slate-700/60 px-4">
+        <Link href="/" className="flex items-center gap-2.5 overflow-hidden">
+          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-blue-600 font-bold text-white text-sm shadow-lg shadow-blue-500/30">
             IX
           </div>
           {!collapsed && (
@@ -71,8 +71,24 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         </Link>
       </div>
 
+      {/* Search shortcut (only when expanded) */}
+      {!collapsed && (
+        <div className="px-3 py-3">
+          <button
+            onClick={onOpenCommand}
+            className="flex w-full items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-400 transition-colors hover:border-slate-600 hover:text-slate-300"
+          >
+            <Search className="h-3.5 w-3.5" />
+            <span className="flex-1 text-left">Quick search...</span>
+            <kbd className="rounded border border-slate-700 bg-slate-900 px-1.5 py-0.5 text-[10px]">
+              ⌘K
+            </kbd>
+          </button>
+        </div>
+      )}
+
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-4">
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-2">
         {navigationItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);
@@ -82,27 +98,38 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               key={item.href}
               href={item.href}
               className={cn(
-                "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                 active
-                  ? "bg-blue-600 text-white"
-                  : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                  ? "text-white"
+                  : "text-slate-400 hover:bg-slate-800 hover:text-white"
               )}
               title={collapsed ? item.label : undefined}
             >
+              {/* Active indicator pill */}
+              {active && (
+                <motion.div
+                  layoutId="activeNavItem"
+                  className="absolute inset-0 rounded-lg bg-blue-600"
+                  transition={{ type: "spring", bounce: 0.15, duration: 0.4 }}
+                />
+              )}
+
               <Icon
                 className={cn(
-                  "h-5 w-5 flex-shrink-0",
+                  "relative z-10 h-5 w-5 flex-shrink-0",
                   active ? "text-white" : "text-slate-400 group-hover:text-white"
                 )}
               />
-              {!collapsed && <span className="truncate">{item.label}</span>}
+              {!collapsed && (
+                <span className="relative z-10 truncate">{item.label}</span>
+              )}
             </Link>
           );
         })}
       </nav>
 
       {/* Collapse Toggle */}
-      <div className="border-t border-slate-700 p-2">
+      <div className="border-t border-slate-700/60 p-2">
         <button
           onClick={onToggle}
           className="flex w-full items-center justify-center rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"

@@ -40,7 +40,11 @@ function getPageTitle(pathname: string): string {
   return "Dashboard";
 }
 
-export function Header() {
+interface HeaderProps {
+  onOpenCommand?: () => void;
+}
+
+export function Header({ onOpenCommand }: HeaderProps) {
   const pathname = usePathname();
   const [searchQuery, setSearchQuery] = useState("");
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -73,17 +77,17 @@ export function Header() {
 
       {/* Right Section */}
       <div className="flex items-center gap-4">
-        {/* Search Bar */}
-        <div className="relative hidden md:block">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-9 w-64 rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
-        </div>
+        {/* Search / Command Palette trigger */}
+        <button
+          onClick={onOpenCommand}
+          className="relative hidden h-9 w-64 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 pl-3 pr-3 text-sm text-slate-400 transition-colors hover:border-blue-400 hover:bg-white md:flex"
+        >
+          <Search className="h-4 w-4 flex-shrink-0" />
+          <span className="flex-1 text-left">Search...</span>
+          <kbd className="flex items-center gap-0.5 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] text-slate-500">
+            ⌘K
+          </kbd>
+        </button>
 
         {/* Notification Bell */}
         <button
