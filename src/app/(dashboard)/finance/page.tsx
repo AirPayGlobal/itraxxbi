@@ -627,7 +627,7 @@ export default function FinancePage() {
                     tickLine={false}
                   />
                   <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
+                    formatter={(value) => formatCurrency(Number(value ?? 0))}
                     contentStyle={{
                       borderRadius: "8px",
                       border: "1px solid #e2e8f0",
@@ -670,7 +670,7 @@ export default function FinancePage() {
                     tickLine={false}
                   />
                   <Tooltip
-                    formatter={(value: number) => [formatCurrency(value), "Profit"]}
+                    formatter={(value) => [formatCurrency(Number(value ?? 0)), "Profit"] as [string, string]}
                     contentStyle={{
                       borderRadius: "8px",
                       border: "1px solid #e2e8f0",
@@ -753,7 +753,7 @@ export default function FinancePage() {
                     width={80}
                   />
                   <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
+                    formatter={(value) => formatCurrency(Number(value ?? 0))}
                     contentStyle={{
                       borderRadius: "8px",
                       border: "1px solid #e2e8f0",

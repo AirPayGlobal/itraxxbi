@@ -418,7 +418,7 @@ export default function StaffPerformancePage() {
                   tickFormatter={(value: number) => `${value}%`}
                 />
                 <Tooltip
-                  formatter={(value: number) => [`${value}%`, "Score"]}
+                  formatter={(value) => [`${value ?? 0}%`, 'Score'] as [string, string]}
                   contentStyle={{
                     borderRadius: "8px",
                     border: "1px solid #e2e8f0",
