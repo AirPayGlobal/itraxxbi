@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Search,
   Ticket,
+  Receipt,
 } from "lucide-react";
 
 const navigationItems = [
@@ -30,6 +31,7 @@ const navigationItems = [
   { label: "Customers", href: "/customers", icon: Users },
   { label: "Staff Performance", href: "/staff", icon: BarChart },
   { label: "HR & Leave", href: "/hr", icon: Calendar },
+  { label: "Payslips", href: "/payslips", icon: Receipt },
   { label: "Documents", href: "/documents", icon: FileText },
   { label: "Inventory", href: "/inventory", icon: Package },
   { label: "Finance", href: "/finance", icon: DollarSign },
