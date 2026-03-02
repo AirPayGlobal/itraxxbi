@@ -19,12 +19,14 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
+  Ticket,
 } from "lucide-react";
 
 const navigationItems = [
   { label: "Dashboard", href: "/", icon: Home },
   { label: "Tasks", href: "/tasks", icon: CheckSquare },
   { label: "Job Cards", href: "/jobcards", icon: Wrench },
+  { label: "Tickets", href: "/tickets", icon: Ticket },
   { label: "Customers", href: "/customers", icon: Users },
   { label: "Staff Performance", href: "/staff", icon: BarChart },
   { label: "HR & Leave", href: "/hr", icon: Calendar },
