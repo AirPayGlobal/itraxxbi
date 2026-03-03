@@ -22,6 +22,7 @@ import {
   Ticket,
   Receipt,
   UserCircle,
+  MessageSquare,
 } from "lucide-react";
 
 const navigationItems = [
@@ -37,6 +38,7 @@ const navigationItems = [
   { label: "Inventory", href: "/inventory", icon: Package },
   { label: "Finance", href: "/finance", icon: DollarSign },
   { label: "My Portal", href: "/my-portal", icon: UserCircle },
+  { label: "Meeting AI", href: "/meeting-ai", icon: MessageSquare },
   { label: "TRAXX AI", href: "/traxx", icon: Bot },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
