@@ -27,6 +27,13 @@ import {
   ThumbsUp,
   ThumbsDown,
   MessageSquare,
+  ArrowUpFromLine,
+  Wrench,
+  BriefcaseBusiness,
+  ShieldCheck,
+  ChevronRight,
+  CircleDot,
+  UserCheck,
 } from "lucide-react";
 import {
   BarChart,
@@ -48,6 +55,20 @@ import { cn, formatCurrency, formatDate } from "@/lib/utils";
 
 type Stage = "lead" | "qualified" | "proposal" | "negotiation" | "closed_won" | "closed_lost";
 
+type EscalationDept = "technical" | "finance" | "management";
+type EscalationStatus = "pending" | "in_review" | "approved" | "rejected";
+
+interface Escalation {
+  id: string;
+  department: EscalationDept;
+  status: EscalationStatus;
+  reason: string;
+  requestedBy: string;
+  requestedDate: string;
+  respondedDate: string | null;
+  responseNote: string | null;
+}
+
 interface Deal {
   id: string;
   title: string;
@@ -63,6 +84,7 @@ interface Deal {
   lastActivity: string;
   notes: string;
   source: string;
+  escalations: Escalation[];
 }
 
 interface StageConfig {
@@ -87,6 +109,12 @@ interface AIInsight {
   dismissed: boolean;
 }
 
+const escalationConfig: Record<EscalationDept, { label: string; icon: string; color: string; bgColor: string; description: string }> = {
+  technical: { label: "Technical Team", icon: "wrench", color: "text-blue-700", bgColor: "bg-blue-50", description: "Request technical assessment, solution design, or feasibility review" },
+  finance: { label: "Finance Team", icon: "dollar", color: "text-emerald-700", bgColor: "bg-emerald-50", description: "Request pricing approval, discount authorization, or payment terms review" },
+  management: { label: "Management", icon: "shield", color: "text-purple-700", bgColor: "bg-purple-50", description: "Request executive involvement, strategic decision, or contract approval" },
+};
+
 const emptyDeal: Omit<Deal, "id" | "createdDate" | "lastActivity"> = {
   title: "",
   company: "",
@@ -99,6 +127,7 @@ const emptyDeal: Omit<Deal, "id" | "createdDate" | "lastActivity"> = {
   expectedCloseDate: "",
   notes: "",
   source: "Website",
+  escalations: [],
 };
 
 // ---------------------------------------------------------------------------
@@ -134,6 +163,9 @@ const mockDeals: Deal[] = [
     lastActivity: "2026-03-20",
     notes: "Final pricing discussion scheduled",
     source: "Referral",
+    escalations: [
+      { id: "esc-1", department: "finance", status: "approved", reason: "Customer requesting 15% volume discount on 50+ unit order", requestedBy: "Sarah K.", requestedDate: "2026-03-12", respondedDate: "2026-03-14", responseNote: "Approved up to 12% discount. Margin still within target." },
+    ],
   },
   {
     id: "2",
@@ -150,6 +182,9 @@ const mockDeals: Deal[] = [
     lastActivity: "2026-03-18",
     notes: "Technical proposal submitted, awaiting review",
     source: "Website",
+    escalations: [
+      { id: "esc-2", department: "technical", status: "in_review", reason: "Client requires integration with their existing SAP fleet module. Need technical feasibility assessment.", requestedBy: "James M.", requestedDate: "2026-03-16", respondedDate: null, responseNote: null },
+    ],
   },
   {
     id: "3",
@@ -166,6 +201,7 @@ const mockDeals: Deal[] = [
     lastActivity: "2026-03-10",
     notes: "Contract signed, installation scheduled",
     source: "Existing Customer",
+    escalations: [],
   },
   {
     id: "4",
@@ -182,6 +218,7 @@ const mockDeals: Deal[] = [
     lastActivity: "2026-03-19",
     notes: "Initial requirements gathering complete",
     source: "Cold Outreach",
+    escalations: [],
   },
   {
     id: "5",
@@ -198,6 +235,7 @@ const mockDeals: Deal[] = [
     lastActivity: "2026-03-15",
     notes: "Inbound enquiry from website",
     source: "Website",
+    escalations: [],
   },
   {
     id: "6",
@@ -214,6 +252,7 @@ const mockDeals: Deal[] = [
     lastActivity: "2026-03-17",
     notes: "Demo completed, proposal being reviewed",
     source: "Trade Show",
+    escalations: [],
   },
   {
     id: "7",
@@ -230,6 +269,7 @@ const mockDeals: Deal[] = [
     lastActivity: "2026-03-16",
     notes: "Technical evaluation in progress",
     source: "Referral",
+    escalations: [],
   },
   {
     id: "8",
@@ -246,6 +286,7 @@ const mockDeals: Deal[] = [
     lastActivity: "2026-03-18",
     notes: "Initial contact via LinkedIn",
     source: "Social Media",
+    escalations: [],
   },
   {
     id: "9",
@@ -262,6 +303,10 @@ const mockDeals: Deal[] = [
     lastActivity: "2026-03-21",
     notes: "Contract terms under legal review",
     source: "Tender",
+    escalations: [
+      { id: "esc-3", department: "management", status: "pending", reason: "Deal value exceeds $250K threshold. Requires executive sign-off on contract terms and SLA commitments.", requestedBy: "Sarah K.", requestedDate: "2026-03-21", respondedDate: null, responseNote: null },
+      { id: "esc-4", department: "technical", status: "approved", reason: "Mine site requires explosion-proof GPS hardware and underground signal boosting. Need specialist equipment confirmation.", requestedBy: "James M.", requestedDate: "2026-03-05", respondedDate: "2026-03-10", responseNote: "Confirmed. We can source ATEX-certified units from our supplier. Lead time 4-6 weeks." },
+    ],
   },
   {
     id: "10",
@@ -278,6 +323,7 @@ const mockDeals: Deal[] = [
     lastActivity: "2026-03-01",
     notes: "Lost to competitor on price",
     source: "Website",
+    escalations: [],
   },
   {
     id: "11",
@@ -294,6 +340,7 @@ const mockDeals: Deal[] = [
     lastActivity: "2026-02-28",
     notes: "Deployment complete, invoiced",
     source: "Referral",
+    escalations: [],
   },
   {
     id: "12",
@@ -310,6 +357,7 @@ const mockDeals: Deal[] = [
     lastActivity: "2026-03-20",
     notes: "Budget approval pending",
     source: "Cold Outreach",
+    escalations: [],
   },
 ];
 
@@ -353,6 +401,10 @@ export default function SalesPipelinePage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiChatInput, setAiChatInput] = useState("");
   const [aiChatMessages, setAiChatMessages] = useState<{ role: "user" | "ai"; text: string }[]>([]);
+  const [showEscalateModal, setShowEscalateModal] = useState(false);
+  const [escalateDept, setEscalateDept] = useState<EscalationDept | null>(null);
+  const [escalateReason, setEscalateReason] = useState("");
+  const [escalateRequestedBy, setEscalateRequestedBy] = useState("");
 
   const filteredDeals = useMemo(() => {
     if (!searchQuery) return deals;
@@ -648,6 +700,64 @@ export default function SalesPipelinePage() {
     setAiInsights((prev) => prev.map((i) => (i.id === id ? { ...i, dismissed: true } : i)));
   };
 
+  const handleEscalate = () => {
+    if (!selectedDeal || !escalateDept || !escalateReason.trim() || !escalateRequestedBy.trim()) return;
+    const newEscalation: Escalation = {
+      id: `esc-${Date.now()}`,
+      department: escalateDept,
+      status: "pending",
+      reason: escalateReason.trim(),
+      requestedBy: escalateRequestedBy.trim(),
+      requestedDate: new Date().toISOString().split("T")[0],
+      respondedDate: null,
+      responseNote: null,
+    };
+    setDeals((prev) =>
+      prev.map((d) =>
+        d.id === selectedDeal.id
+          ? { ...d, escalations: [...d.escalations, newEscalation], lastActivity: new Date().toISOString().split("T")[0] }
+          : d
+      )
+    );
+    setSelectedDeal((prev) =>
+      prev ? { ...prev, escalations: [...prev.escalations, newEscalation], lastActivity: new Date().toISOString().split("T")[0] } : prev
+    );
+    setShowEscalateModal(false);
+    setEscalateDept(null);
+    setEscalateReason("");
+    setEscalateRequestedBy("");
+  };
+
+  const updateEscalationStatus = (dealId: string, escId: string, status: EscalationStatus, responseNote: string) => {
+    const today = new Date().toISOString().split("T")[0];
+    const updateEsc = (escalations: Escalation[]) =>
+      escalations.map((e) => (e.id === escId ? { ...e, status, respondedDate: today, responseNote } : e));
+    setDeals((prev) =>
+      prev.map((d) => (d.id === dealId ? { ...d, escalations: updateEsc(d.escalations) } : d))
+    );
+    if (selectedDeal?.id === dealId) {
+      setSelectedDeal((prev) => prev ? { ...prev, escalations: updateEsc(prev.escalations) } : prev);
+    }
+  };
+
+  const getEscalationStatusStyle = (status: EscalationStatus) => {
+    switch (status) {
+      case "pending": return "bg-amber-100 text-amber-700";
+      case "in_review": return "bg-blue-100 text-blue-700";
+      case "approved": return "bg-emerald-100 text-emerald-700";
+      case "rejected": return "bg-red-100 text-red-700";
+    }
+  };
+
+  const getEscalationStatusLabel = (status: EscalationStatus) => {
+    switch (status) {
+      case "pending": return "Pending";
+      case "in_review": return "In Review";
+      case "approved": return "Approved";
+      case "rejected": return "Rejected";
+    }
+  };
+
   const activeInsights = aiInsights.filter((i) => !i.dismissed);
 
   return (
@@ -836,11 +946,23 @@ export default function SalesPipelinePage() {
                           {deal.probability}%
                         </span>
                       </div>
-                      <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-100">
-                        <Clock className="h-3 w-3 text-slate-400" />
-                        <span className="text-xs text-slate-400">
-                          Close {formatDate(deal.expectedCloseDate)}
-                        </span>
+                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100">
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="h-3 w-3 text-slate-400" />
+                          <span className="text-xs text-slate-400">
+                            Close {formatDate(deal.expectedCloseDate)}
+                          </span>
+                        </div>
+                        {deal.escalations.length > 0 && (
+                          <div className="flex items-center gap-1">
+                            <ArrowUpFromLine className="h-3 w-3 text-orange-500" />
+                            <span className="text-[10px] font-medium text-orange-600">
+                              {deal.escalations.filter((e) => e.status === "pending" || e.status === "in_review").length > 0
+                                ? `${deal.escalations.filter((e) => e.status === "pending" || e.status === "in_review").length} active`
+                                : `${deal.escalations.length} closed`}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -1051,8 +1173,204 @@ export default function SalesPipelinePage() {
                 <p className="text-sm text-slate-600 bg-slate-50 rounded-lg p-3">{selectedDeal.notes}</p>
               </div>
 
+              {/* Escalations Section */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                    <ArrowUpFromLine className="h-4 w-4 text-orange-500" />
+                    Escalations
+                    {selectedDeal.escalations.length > 0 && (
+                      <span className="text-xs font-medium px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 normal-case">
+                        {selectedDeal.escalations.length}
+                      </span>
+                    )}
+                  </h4>
+                  {selectedDeal.stage !== "closed_won" && selectedDeal.stage !== "closed_lost" && (
+                    <button
+                      onClick={() => setShowEscalateModal(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 text-orange-700 border border-orange-200 rounded-lg text-xs font-medium hover:bg-orange-100 transition-colors"
+                    >
+                      <ArrowUpFromLine className="h-3.5 w-3.5" />
+                      Escalate
+                    </button>
+                  )}
+                </div>
+
+                {selectedDeal.escalations.length === 0 && (
+                  <p className="text-sm text-slate-400 italic">No escalations for this deal</p>
+                )}
+
+                {selectedDeal.escalations.map((esc) => (
+                  <div key={esc.id} className="border border-slate-200 rounded-lg overflow-hidden">
+                    <div className="px-3 py-2 bg-slate-50 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {esc.department === "technical" && <Wrench className="h-3.5 w-3.5 text-blue-600" />}
+                        {esc.department === "finance" && <DollarSign className="h-3.5 w-3.5 text-emerald-600" />}
+                        {esc.department === "management" && <ShieldCheck className="h-3.5 w-3.5 text-purple-600" />}
+                        <span className="text-xs font-semibold text-slate-700">
+                          {escalationConfig[esc.department].label}
+                        </span>
+                      </div>
+                      <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase", getEscalationStatusStyle(esc.status))}>
+                        {getEscalationStatusLabel(esc.status)}
+                      </span>
+                    </div>
+                    <div className="p-3 space-y-2">
+                      <p className="text-xs text-slate-600 leading-relaxed">{esc.reason}</p>
+                      <div className="flex items-center gap-3 text-[11px] text-slate-400">
+                        <span className="flex items-center gap-1">
+                          <UserCheck className="h-3 w-3" />
+                          {esc.requestedBy}
+                        </span>
+                        <span>{formatDate(esc.requestedDate)}</span>
+                      </div>
+                      {esc.responseNote && (
+                        <div className={cn(
+                          "mt-2 p-2 rounded text-xs leading-relaxed",
+                          esc.status === "approved" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
+                          esc.status === "rejected" ? "bg-red-50 text-red-700 border border-red-200" :
+                          "bg-blue-50 text-blue-700 border border-blue-200"
+                        )}>
+                          <p className="font-medium mb-0.5">
+                            {esc.status === "approved" ? "Approved" : esc.status === "rejected" ? "Rejected" : "Response"}
+                            {esc.respondedDate && ` on ${formatDate(esc.respondedDate)}`}:
+                          </p>
+                          <p>{esc.responseNote}</p>
+                        </div>
+                      )}
+                      {(esc.status === "pending" || esc.status === "in_review") && (
+                        <div className="flex gap-2 mt-2">
+                          {esc.status === "pending" && (
+                            <button
+                              onClick={() => updateEscalationStatus(selectedDeal.id, esc.id, "in_review", "Under review by the team.")}
+                              className="flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[11px] font-medium hover:bg-blue-100 transition-colors"
+                            >
+                              <CircleDot className="h-3 w-3" />
+                              Mark In Review
+                            </button>
+                          )}
+                          <button
+                            onClick={() => updateEscalationStatus(selectedDeal.id, esc.id, "approved", "Approved. Proceed with the deal.")}
+                            className="flex items-center gap-1 px-2 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-[11px] font-medium hover:bg-emerald-100 transition-colors"
+                          >
+                            <CheckCircle2 className="h-3 w-3" />
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => updateEscalationStatus(selectedDeal.id, esc.id, "rejected", "Rejected. Requirements not met.")}
+                            className="flex items-center gap-1 px-2 py-1 bg-red-50 text-red-700 border border-red-200 rounded text-[11px] font-medium hover:bg-red-100 transition-colors"
+                          >
+                            <X className="h-3 w-3" />
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
               <div className="text-xs text-slate-400">
                 Last activity: {formatDate(selectedDeal.lastActivity)}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Escalation Modal */}
+      {showEscalateModal && selectedDeal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowEscalateModal(false)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+            <div className="bg-gradient-to-r from-orange-500 to-amber-500 px-6 py-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-white">Escalate Deal</h2>
+                <p className="text-xs text-white/80">{selectedDeal.title} &mdash; {selectedDeal.company}</p>
+              </div>
+              <button onClick={() => { setShowEscalateModal(false); setEscalateDept(null); }} className="p-1 hover:bg-white/10 rounded-lg transition-colors">
+                <X className="h-5 w-5 text-white" />
+              </button>
+            </div>
+            <div className="p-6 space-y-5">
+              {/* Department Selection */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-3">Escalate to *</label>
+                <div className="grid grid-cols-3 gap-3">
+                  {(["technical", "finance", "management"] as EscalationDept[]).map((dept) => (
+                    <button
+                      key={dept}
+                      onClick={() => setEscalateDept(dept)}
+                      className={cn(
+                        "flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all text-center",
+                        escalateDept === dept
+                          ? dept === "technical" ? "border-blue-500 bg-blue-50" :
+                            dept === "finance" ? "border-emerald-500 bg-emerald-50" :
+                            "border-purple-500 bg-purple-50"
+                          : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                      )}
+                    >
+                      {dept === "technical" && <Wrench className={cn("h-5 w-5", escalateDept === dept ? "text-blue-600" : "text-slate-400")} />}
+                      {dept === "finance" && <BriefcaseBusiness className={cn("h-5 w-5", escalateDept === dept ? "text-emerald-600" : "text-slate-400")} />}
+                      {dept === "management" && <ShieldCheck className={cn("h-5 w-5", escalateDept === dept ? "text-purple-600" : "text-slate-400")} />}
+                      <span className={cn("text-xs font-medium", escalateDept === dept ? "text-slate-900" : "text-slate-500")}>
+                        {escalationConfig[dept].label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {escalateDept && (
+                  <p className="text-xs text-slate-500 mt-2 bg-slate-50 rounded-lg p-2">
+                    {escalationConfig[escalateDept].description}
+                  </p>
+                )}
+              </div>
+
+              {/* Requested By */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Your Name *</label>
+                <input
+                  type="text"
+                  value={escalateRequestedBy}
+                  onChange={(e) => setEscalateRequestedBy(e.target.value)}
+                  placeholder="e.g. Sarah K."
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+
+              {/* Reason */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Reason for Escalation *</label>
+                <textarea
+                  value={escalateReason}
+                  onChange={(e) => setEscalateReason(e.target.value)}
+                  placeholder={
+                    escalateDept === "technical" ? "Describe the technical requirement or challenge..." :
+                    escalateDept === "finance" ? "Describe the pricing, discount, or payment terms request..." :
+                    escalateDept === "management" ? "Describe why executive involvement is needed..." :
+                    "Select a department first, then describe the reason..."
+                  }
+                  rows={4}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setShowEscalateModal(false); setEscalateDept(null); setEscalateReason(""); setEscalateRequestedBy(""); }}
+                  className="flex-1 px-4 py-2.5 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleEscalate}
+                  disabled={!escalateDept || !escalateReason.trim() || !escalateRequestedBy.trim()}
+                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-lg text-sm font-medium hover:from-orange-600 hover:to-amber-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  <ArrowUpFromLine className="h-4 w-4" />
+                  Submit Escalation
+                </button>
               </div>
             </div>
           </div>
