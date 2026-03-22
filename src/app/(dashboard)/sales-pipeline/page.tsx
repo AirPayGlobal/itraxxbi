@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import {
   DollarSign,
   TrendingUp,
@@ -8,18 +8,25 @@ import {
   Target,
   Plus,
   Search,
-  MoreHorizontal,
   Phone,
   Mail,
-  Calendar,
   ArrowUpRight,
-  ArrowDownRight,
-  Filter,
   GripVertical,
   Building2,
   Clock,
   X,
-  ChevronDown,
+  Bot,
+  Sparkles,
+  AlertTriangle,
+  Bell,
+  Lightbulb,
+  CheckCircle2,
+  Send,
+  RefreshCw,
+  Zap,
+  ThumbsUp,
+  ThumbsDown,
+  MessageSquare,
 } from "lucide-react";
 import {
   BarChart,
@@ -65,6 +72,34 @@ interface StageConfig {
   bgColor: string;
   borderColor: string;
 }
+
+type InsightType = "reminder" | "suggestion" | "risk" | "opportunity";
+
+interface AIInsight {
+  id: string;
+  type: InsightType;
+  title: string;
+  description: string;
+  dealId: string | null;
+  dealTitle: string | null;
+  priority: "high" | "medium" | "low";
+  actionLabel: string | null;
+  dismissed: boolean;
+}
+
+const emptyDeal: Omit<Deal, "id" | "createdDate" | "lastActivity"> = {
+  title: "",
+  company: "",
+  contact: "",
+  email: "",
+  phone: "",
+  value: 0,
+  probability: 10,
+  stage: "lead",
+  expectedCloseDate: "",
+  notes: "",
+  source: "Website",
+};
 
 // ---------------------------------------------------------------------------
 // Stage Configuration
@@ -311,6 +346,13 @@ export default function SalesPipelinePage() {
   const [deals, setDeals] = useState<Deal[]>(mockDeals);
   const [draggedDeal, setDraggedDeal] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<Stage | null>(null);
+  const [showAddDeal, setShowAddDeal] = useState(false);
+  const [newDeal, setNewDeal] = useState(emptyDeal);
+  const [showAIPanel, setShowAIPanel] = useState(false);
+  const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiChatInput, setAiChatInput] = useState("");
+  const [aiChatMessages, setAiChatMessages] = useState<{ role: "user" | "ai"; text: string }[]>([]);
 
   const filteredDeals = useMemo(() => {
     if (!searchQuery) return deals;
@@ -392,6 +434,222 @@ export default function SalesPipelinePage() {
   const stageTotal = (stage: Stage) =>
     dealsByStage[stage].reduce((sum, d) => sum + d.value, 0);
 
+  const handleAddDeal = () => {
+    if (!newDeal.title || !newDeal.company) return;
+    const today = new Date().toISOString().split("T")[0];
+    const deal: Deal = {
+      ...newDeal,
+      id: String(Date.now()),
+      createdDate: today,
+      lastActivity: today,
+    };
+    setDeals((prev) => [...prev, deal]);
+    setNewDeal(emptyDeal);
+    setShowAddDeal(false);
+  };
+
+  const generateAIInsights = useCallback(() => {
+    setAiLoading(true);
+    const today = new Date();
+    const insights: AIInsight[] = [];
+
+    // Stale deals - no activity in 5+ days
+    deals.forEach((d) => {
+      if (d.stage === "closed_won" || d.stage === "closed_lost") return;
+      const lastAct = new Date(d.lastActivity);
+      const daysSince = Math.floor((today.getTime() - lastAct.getTime()) / (1000 * 60 * 60 * 24));
+      if (daysSince >= 5) {
+        insights.push({
+          id: `stale-${d.id}`,
+          type: "reminder",
+          title: "Follow-up overdue",
+          description: `No activity on "${d.title}" for ${daysSince} days. ${d.contact} at ${d.company} may lose interest. Consider scheduling a call or sending a check-in email.`,
+          dealId: d.id,
+          dealTitle: d.title,
+          priority: daysSince >= 10 ? "high" : "medium",
+          actionLabel: "View Deal",
+          dismissed: false,
+        });
+      }
+    });
+
+    // Deals closing soon
+    deals.forEach((d) => {
+      if (d.stage === "closed_won" || d.stage === "closed_lost") return;
+      const closeDate = new Date(d.expectedCloseDate);
+      const daysUntil = Math.floor((closeDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      if (daysUntil <= 14 && daysUntil >= 0 && d.stage !== "negotiation") {
+        insights.push({
+          id: `closing-${d.id}`,
+          type: "risk",
+          title: "Close date approaching",
+          description: `"${d.title}" (${formatCurrency(d.value)}) closes in ${daysUntil} days but is still in ${stages.find((s) => s.id === d.stage)?.label}. Consider accelerating or adjusting the timeline.`,
+          dealId: d.id,
+          dealTitle: d.title,
+          priority: daysUntil <= 7 ? "high" : "medium",
+          actionLabel: "View Deal",
+          dismissed: false,
+        });
+      }
+    });
+
+    // High-value deals with low probability
+    deals.forEach((d) => {
+      if (d.stage === "closed_won" || d.stage === "closed_lost") return;
+      if (d.value >= 100000 && d.probability <= 30) {
+        insights.push({
+          id: `highval-${d.id}`,
+          type: "opportunity",
+          title: "High-value deal needs attention",
+          description: `"${d.title}" is worth ${formatCurrency(d.value)} but only has ${d.probability}% probability. Prioritize a discovery call with ${d.contact} to understand blockers and increase confidence.`,
+          dealId: d.id,
+          dealTitle: d.title,
+          priority: "high",
+          actionLabel: "View Deal",
+          dismissed: false,
+        });
+      }
+    });
+
+    // Suggest upsell for won deals
+    const wonDeals = deals.filter((d) => d.stage === "closed_won");
+    if (wonDeals.length > 0) {
+      const topWon = wonDeals.reduce((a, b) => (a.value > b.value ? a : b));
+      insights.push({
+        id: `upsell-${topWon.id}`,
+        type: "suggestion",
+        title: "Upsell opportunity",
+        description: `${topWon.company} recently closed "${topWon.title}" for ${formatCurrency(topWon.value)}. Consider reaching out to ${topWon.contact} about complementary services like driver behaviour monitoring or fuel management.`,
+        dealId: topWon.id,
+        dealTitle: topWon.title,
+        priority: "medium",
+        actionLabel: "View Deal",
+        dismissed: false,
+      });
+    }
+
+    // Pipeline balance advice
+    const leadCount = deals.filter((d) => d.stage === "lead").length;
+    const qualifiedCount = deals.filter((d) => d.stage === "qualified").length;
+    if (leadCount <= 2) {
+      insights.push({
+        id: "pipeline-low",
+        type: "suggestion",
+        title: "Pipeline top is thin",
+        description: `Only ${leadCount} deals in the Lead stage. Your pipeline could dry up in 2-3 months. Consider increasing outreach efforts, running a LinkedIn campaign, or attending industry events to generate more leads.`,
+        dealId: null,
+        dealTitle: null,
+        priority: "medium",
+        actionLabel: null,
+        dismissed: false,
+      });
+    }
+
+    // Win/loss analysis
+    const lostDeals = deals.filter((d) => d.stage === "closed_lost");
+    if (lostDeals.length > 0) {
+      const lostSources = lostDeals.map((d) => d.source);
+      const commonSource = lostSources.sort((a, b) =>
+        lostSources.filter((s) => s === b).length - lostSources.filter((s) => s === a).length
+      )[0];
+      insights.push({
+        id: "loss-pattern",
+        type: "risk",
+        title: "Loss pattern detected",
+        description: `Most lost deals came from "${commonSource}" leads. Review your qualification criteria for this channel or adjust messaging to better pre-qualify prospects before investing sales effort.`,
+        dealId: null,
+        dealTitle: null,
+        priority: "low",
+        actionLabel: null,
+        dismissed: false,
+      });
+    }
+
+    // Weighted pipeline advice
+    if (metrics.weightedPipeline < metrics.totalPipeline * 0.4) {
+      insights.push({
+        id: "low-confidence",
+        type: "risk",
+        title: "Low pipeline confidence",
+        description: `Your weighted pipeline (${formatCurrency(metrics.weightedPipeline)}) is only ${Math.round((metrics.weightedPipeline / metrics.totalPipeline) * 100)}% of total. Many deals have low probability. Focus on moving qualified deals forward with demos and proposals.`,
+        dealId: null,
+        dealTitle: null,
+        priority: "medium",
+        actionLabel: null,
+        dismissed: false,
+      });
+    }
+
+    // Sort by priority
+    const priorityOrder = { high: 0, medium: 1, low: 2 };
+    insights.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+
+    setTimeout(() => {
+      setAiInsights(insights);
+      setAiLoading(false);
+    }, 800);
+  }, [deals, metrics.weightedPipeline, metrics.totalPipeline]);
+
+  const handleAIChat = () => {
+    if (!aiChatInput.trim()) return;
+    const question = aiChatInput.trim();
+    setAiChatMessages((prev) => [...prev, { role: "user", text: question }]);
+    setAiChatInput("");
+
+    const q = question.toLowerCase();
+    let response = "";
+
+    if (q.includes("best") && (q.includes("deal") || q.includes("opportunity"))) {
+      const best = deals
+        .filter((d) => d.stage !== "closed_won" && d.stage !== "closed_lost")
+        .sort((a, b) => b.value * b.probability - a.value * a.probability)[0];
+      response = best
+        ? `Your strongest opportunity is "${best.title}" with ${best.company} — ${formatCurrency(best.value)} at ${best.probability}% probability (weighted: ${formatCurrency(best.value * best.probability / 100)}). ${best.stage === "negotiation" ? "It's in negotiation, so focus on closing terms." : `It's in ${stages.find(s => s.id === best.stage)?.label}, consider pushing it to the next stage.`}`
+        : "No active deals found.";
+    } else if (q.includes("risk") || q.includes("danger") || q.includes("at risk")) {
+      const atRisk = deals.filter((d) => {
+        if (d.stage === "closed_won" || d.stage === "closed_lost") return false;
+        const daysSinceActivity = Math.floor((new Date().getTime() - new Date(d.lastActivity).getTime()) / 86400000);
+        return daysSinceActivity > 5 || d.probability < 30;
+      });
+      response = atRisk.length > 0
+        ? `${atRisk.length} deals are at risk:\n${atRisk.map(d => `• "${d.title}" (${d.company}) — ${formatCurrency(d.value)}, ${d.probability}% prob`).join("\n")}\n\nI recommend prioritizing follow-ups on the highest-value deals first.`
+        : "No deals currently appear to be at significant risk. Keep up the good work!";
+    } else if (q.includes("forecast") || q.includes("revenue") || q.includes("predict")) {
+      const active = deals.filter(d => d.stage !== "closed_won" && d.stage !== "closed_lost");
+      const weighted = active.reduce((sum, d) => sum + d.value * (d.probability / 100), 0);
+      const won = deals.filter(d => d.stage === "closed_won").reduce((sum, d) => sum + d.value, 0);
+      response = `Based on current pipeline:\n• Already won: ${formatCurrency(won)}\n• Weighted forecast (active deals): ${formatCurrency(weighted)}\n• Best case (all active close): ${formatCurrency(active.reduce((s, d) => s + d.value, 0))}\n\nTo hit higher targets, focus on the ${active.filter(d => d.probability >= 50).length} deals with 50%+ probability — they represent your most likely near-term revenue.`;
+    } else if (q.includes("next") && (q.includes("step") || q.includes("action") || q.includes("do"))) {
+      const urgentDeals = deals
+        .filter(d => d.stage !== "closed_won" && d.stage !== "closed_lost")
+        .sort((a, b) => new Date(a.expectedCloseDate).getTime() - new Date(b.expectedCloseDate).getTime())
+        .slice(0, 3);
+      response = `Here are your top priorities:\n${urgentDeals.map((d, i) => `${i + 1}. "${d.title}" (${d.company}) — ${stages.find(s => s.id === d.stage)?.label}, closes ${formatDate(d.expectedCloseDate)}\n   → ${d.stage === "lead" ? "Qualify the lead: schedule a discovery call" : d.stage === "qualified" ? "Send a tailored proposal" : d.stage === "proposal" ? "Follow up on proposal, address concerns" : "Push for contract signature"}`).join("\n")}`;
+    } else if (q.includes("source") || q.includes("channel") || q.includes("where")) {
+      const sources: Record<string, { count: number; value: number }> = {};
+      deals.forEach(d => {
+        if (!sources[d.source]) sources[d.source] = { count: 0, value: 0 };
+        sources[d.source].count++;
+        sources[d.source].value += d.value;
+      });
+      const sorted = Object.entries(sources).sort((a, b) => b[1].value - a[1].value);
+      response = `Lead source analysis:\n${sorted.map(([source, data]) => `• ${source}: ${data.count} deals, ${formatCurrency(data.value)} total value`).join("\n")}\n\n${sorted[0][0]} generates the most pipeline value. Consider doubling down on this channel.`;
+    } else {
+      response = `Here's a quick pipeline summary:\n• ${deals.filter(d => d.stage !== "closed_won" && d.stage !== "closed_lost").length} active deals worth ${formatCurrency(metrics.totalPipeline)}\n• Win rate: ${metrics.winRate}%\n• Weighted forecast: ${formatCurrency(metrics.weightedPipeline)}\n\nTry asking me about: "best opportunities", "deals at risk", "revenue forecast", "next actions", or "lead sources".`;
+    }
+
+    setTimeout(() => {
+      setAiChatMessages((prev) => [...prev, { role: "ai", text: response }]);
+    }, 600);
+  };
+
+  const dismissInsight = (id: string) => {
+    setAiInsights((prev) => prev.map((i) => (i.id === id ? { ...i, dismissed: true } : i)));
+  };
+
+  const activeInsights = aiInsights.filter((i) => !i.dismissed);
+
   return (
     <div className="min-h-screen bg-slate-50 p-6 lg:p-8">
       {/* Header */}
@@ -432,6 +690,23 @@ export default function SalesPipelinePage() {
                 List
               </button>
             </div>
+            <button
+              onClick={() => { setShowAIPanel(true); if (aiInsights.length === 0) generateAIInsights(); }}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-600 to-blue-600 text-white rounded-lg text-sm font-medium hover:from-violet-700 hover:to-blue-700 transition-all shadow-sm"
+            >
+              <Sparkles className="h-4 w-4" />
+              AI Assistant
+              {activeInsights.length > 0 && (
+                <span className="bg-white/20 text-white text-xs px-1.5 py-0.5 rounded-full">{activeInsights.length}</span>
+              )}
+            </button>
+            <button
+              onClick={() => setShowAddDeal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              Add Deal
+            </button>
           </div>
         </div>
       </div>
@@ -778,6 +1053,366 @@ export default function SalesPipelinePage() {
 
               <div className="text-xs text-slate-400">
                 Last activity: {formatDate(selectedDeal.lastActivity)}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Deal Modal */}
+      {showAddDeal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setShowAddDeal(false)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+              <h2 className="text-lg font-semibold text-slate-900">Add New Deal</h2>
+              <button onClick={() => setShowAddDeal(false)} className="p-1 hover:bg-slate-100 rounded-lg transition-colors">
+                <X className="h-5 w-5 text-slate-500" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Deal Title *</label>
+                <input
+                  type="text"
+                  value={newDeal.title}
+                  onChange={(e) => setNewDeal((p) => ({ ...p, title: e.target.value }))}
+                  placeholder="e.g. Fleet GPS Installation"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Company *</label>
+                  <input
+                    type="text"
+                    value={newDeal.company}
+                    onChange={(e) => setNewDeal((p) => ({ ...p, company: e.target.value }))}
+                    placeholder="Company name"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Contact Person</label>
+                  <input
+                    type="text"
+                    value={newDeal.contact}
+                    onChange={(e) => setNewDeal((p) => ({ ...p, contact: e.target.value }))}
+                    placeholder="Full name"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={newDeal.email}
+                    onChange={(e) => setNewDeal((p) => ({ ...p, email: e.target.value }))}
+                    placeholder="email@company.com"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
+                  <input
+                    type="tel"
+                    value={newDeal.phone}
+                    onChange={(e) => setNewDeal((p) => ({ ...p, phone: e.target.value }))}
+                    placeholder="+264 61 ..."
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Deal Value (USD)</label>
+                  <input
+                    type="number"
+                    value={newDeal.value || ""}
+                    onChange={(e) => setNewDeal((p) => ({ ...p, value: Number(e.target.value) }))}
+                    placeholder="0"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Expected Close Date</label>
+                  <input
+                    type="date"
+                    value={newDeal.expectedCloseDate}
+                    onChange={(e) => setNewDeal((p) => ({ ...p, expectedCloseDate: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Stage</label>
+                  <select
+                    value={newDeal.stage}
+                    onChange={(e) => setNewDeal((p) => ({ ...p, stage: e.target.value as Stage }))}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  >
+                    {stages.filter((s) => s.id !== "closed_won" && s.id !== "closed_lost").map((s) => (
+                      <option key={s.id} value={s.id}>{s.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Source</label>
+                  <select
+                    value={newDeal.source}
+                    onChange={(e) => setNewDeal((p) => ({ ...p, source: e.target.value }))}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  >
+                    {["Website", "Referral", "Cold Outreach", "Trade Show", "Social Media", "Tender", "Existing Customer"].map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
+                <textarea
+                  value={newDeal.notes}
+                  onChange={(e) => setNewDeal((p) => ({ ...p, notes: e.target.value }))}
+                  placeholder="Any relevant details about this deal..."
+                  rows={3}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowAddDeal(false)}
+                  className="flex-1 px-4 py-2.5 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddDeal}
+                  disabled={!newDeal.title || !newDeal.company}
+                  className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Add Deal
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Sales Assistant Panel */}
+      {showAIPanel && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setShowAIPanel(false)} />
+          <div className="relative bg-white w-full max-w-lg shadow-xl flex flex-col h-full">
+            {/* Header */}
+            <div className="sticky top-0 bg-gradient-to-r from-violet-600 to-blue-600 px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/20 rounded-lg">
+                  <Bot className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-white">AI Sales Assistant</h2>
+                  <p className="text-xs text-white/70">Insights, reminders & suggestions</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={generateAIInsights}
+                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                  title="Refresh insights"
+                >
+                  <RefreshCw className={cn("h-4 w-4 text-white", aiLoading && "animate-spin")} />
+                </button>
+                <button
+                  onClick={() => setShowAIPanel(false)}
+                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <X className="h-5 w-5 text-white" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto">
+              {/* Insights Section */}
+              <div className="p-4 border-b border-slate-200">
+                <div className="flex items-center gap-2 mb-3">
+                  <Zap className="h-4 w-4 text-amber-500" />
+                  <h3 className="text-sm font-semibold text-slate-900">Smart Insights</h3>
+                  <span className="text-xs text-slate-500">({activeInsights.length})</span>
+                </div>
+
+                {aiLoading && (
+                  <div className="flex items-center gap-3 p-4">
+                    <div className="animate-spin h-5 w-5 border-2 border-violet-600 border-t-transparent rounded-full" />
+                    <span className="text-sm text-slate-500">Analyzing your pipeline...</span>
+                  </div>
+                )}
+
+                {!aiLoading && activeInsights.length === 0 && aiInsights.length > 0 && (
+                  <p className="text-sm text-slate-500 p-3">All insights dismissed. Click refresh for new analysis.</p>
+                )}
+
+                {!aiLoading && aiInsights.length === 0 && (
+                  <p className="text-sm text-slate-500 p-3">Click refresh to generate AI insights about your pipeline.</p>
+                )}
+
+                <div className="space-y-2">
+                  {activeInsights.map((insight) => (
+                    <div
+                      key={insight.id}
+                      className={cn(
+                        "rounded-lg border p-3",
+                        insight.type === "reminder" && "bg-blue-50 border-blue-200",
+                        insight.type === "risk" && "bg-red-50 border-red-200",
+                        insight.type === "suggestion" && "bg-emerald-50 border-emerald-200",
+                        insight.type === "opportunity" && "bg-amber-50 border-amber-200"
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-2">
+                          {insight.type === "reminder" && <Bell className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />}
+                          {insight.type === "risk" && <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />}
+                          {insight.type === "suggestion" && <Lightbulb className="h-4 w-4 text-emerald-600 mt-0.5 flex-shrink-0" />}
+                          {insight.type === "opportunity" && <Target className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />}
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-sm font-medium text-slate-900">{insight.title}</h4>
+                              {insight.priority === "high" && (
+                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-red-100 text-red-700 uppercase">Urgent</span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-600 mt-1 leading-relaxed">{insight.description}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                              {insight.actionLabel && insight.dealId && (
+                                <button
+                                  onClick={() => {
+                                    const deal = deals.find((d) => d.id === insight.dealId);
+                                    if (deal) { setSelectedDeal(deal); setShowAIPanel(false); }
+                                  }}
+                                  className="text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                                >
+                                  {insight.actionLabel} &rarr;
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => dismissInsight(insight.id)}
+                          className="p-1 hover:bg-white/50 rounded transition-colors flex-shrink-0"
+                          title="Dismiss"
+                        >
+                          <X className="h-3.5 w-3.5 text-slate-400" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Quick Stats */}
+              <div className="p-4 border-b border-slate-200">
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles className="h-4 w-4 text-violet-500" />
+                  <h3 className="text-sm font-semibold text-slate-900">Pipeline Health</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-slate-50 rounded-lg p-3">
+                    <p className="text-xs text-slate-500">Avg. Deal Size</p>
+                    <p className="text-lg font-bold text-slate-900">{formatCurrency(metrics.avgDealSize)}</p>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-3">
+                    <p className="text-xs text-slate-500">Pipeline Coverage</p>
+                    <p className="text-lg font-bold text-slate-900">
+                      {metrics.totalWon > 0 ? `${(metrics.totalPipeline / metrics.totalWon).toFixed(1)}x` : "N/A"}
+                    </p>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-3">
+                    <p className="text-xs text-slate-500">Deals to Follow Up</p>
+                    <p className="text-lg font-bold text-slate-900">
+                      {deals.filter((d) => {
+                        if (d.stage === "closed_won" || d.stage === "closed_lost") return false;
+                        return Math.floor((new Date().getTime() - new Date(d.lastActivity).getTime()) / 86400000) >= 3;
+                      }).length}
+                    </p>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-3">
+                    <p className="text-xs text-slate-500">Closing This Month</p>
+                    <p className="text-lg font-bold text-slate-900">
+                      {deals.filter((d) => {
+                        if (d.stage === "closed_won" || d.stage === "closed_lost") return false;
+                        const close = new Date(d.expectedCloseDate);
+                        const now = new Date();
+                        return close.getMonth() === now.getMonth() && close.getFullYear() === now.getFullYear();
+                      }).length}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* AI Chat */}
+              <div className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <MessageSquare className="h-4 w-4 text-blue-500" />
+                  <h3 className="text-sm font-semibold text-slate-900">Ask the AI</h3>
+                </div>
+
+                <div className="space-y-3 mb-3 max-h-64 overflow-y-auto">
+                  {aiChatMessages.length === 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-slate-500">Try asking:</p>
+                      {[
+                        "What are my best opportunities?",
+                        "Which deals are at risk?",
+                        "Give me a revenue forecast",
+                        "What should I do next?",
+                        "Analyze my lead sources",
+                      ].map((q) => (
+                        <button
+                          key={q}
+                          onClick={() => { setAiChatInput(q); }}
+                          className="block w-full text-left text-xs text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-lg px-3 py-2 transition-colors"
+                        >
+                          {q}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {aiChatMessages.map((msg, idx) => (
+                    <div key={idx} className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}>
+                      <div className={cn(
+                        "max-w-[85%] rounded-lg px-3 py-2 text-sm",
+                        msg.role === "user"
+                          ? "bg-blue-600 text-white"
+                          : "bg-slate-100 text-slate-700"
+                      )}>
+                        <p className="whitespace-pre-line">{msg.text}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={aiChatInput}
+                    onChange={(e) => setAiChatInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleAIChat()}
+                    placeholder="Ask about your pipeline..."
+                    className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  />
+                  <button
+                    onClick={handleAIChat}
+                    disabled={!aiChatInput.trim()}
+                    className="p-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors disabled:opacity-50"
+                  >
+                    <Send className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
