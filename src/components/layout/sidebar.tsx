@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
@@ -70,25 +69,32 @@ export function Sidebar({ collapsed, onToggle, onOpenCommand }: SidebarProps) {
       )}
     >
       {/* Brand / Logo */}
-      <div className="flex h-16 items-center border-b border-slate-700/60 px-3">
-        <Link href="/" className="flex items-center gap-2 overflow-hidden">
+      <div className={cn("flex items-center border-b border-slate-700/60", collapsed ? "h-16 justify-center px-2" : "h-20 px-4")}>
+        <Link href="/" className="flex items-center overflow-hidden">
           {collapsed ? (
-            <Image
-              src="/logo-icon.svg"
-              alt="iTrackerX"
-              width={36}
-              height={36}
-              className="flex-shrink-0"
-            />
+            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-blue-600 shadow-lg shadow-blue-500/30">
+              <span className="text-sm font-bold text-white">IX</span>
+            </div>
           ) : (
-            <Image
-              src="/logo.svg"
-              alt="iTrackerX - Fleet Data Intelligence"
-              width={180}
-              height={44}
-              className="flex-shrink-0"
-              priority
-            />
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center">
+                <span className="text-xl font-bold tracking-wide">
+                  <span className="text-blue-400">I</span>
+                  <span className="text-slate-200">TRACKER</span>
+                  <span className="text-blue-400">X</span>
+                </span>
+                {/* Signal waves */}
+                <svg width="22" height="20" viewBox="0 0 22 20" fill="none" className="-ml-0.5 -mt-1 flex-shrink-0">
+                  <path d="M4 16 C8 10, 14 10, 18 16" stroke="#3B82F6" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+                  <path d="M6.5 12 C9 8, 13 8, 15.5 12" stroke="#3B82F6" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+                  <path d="M9 9 C10 7, 12 7, 13 9" stroke="#3B82F6" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+                </svg>
+                <span className="ml-1 text-[9px] font-normal text-slate-500 align-super">TM</span>
+              </div>
+              <span className="text-[9px] font-medium tracking-[0.25em] text-slate-500">
+                FLEET DATA INTELLIGENCE
+              </span>
+            </div>
           )}
         </Link>
       </div>
