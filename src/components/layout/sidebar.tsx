@@ -24,6 +24,7 @@ import {
   UserCircle,
   MessageSquare,
   Funnel,
+  UserCheck,
 } from "lucide-react";
 
 const navigationItems = [
@@ -32,6 +33,7 @@ const navigationItems = [
   { label: "Job Cards", href: "/jobcards", icon: Wrench },
   { label: "Tickets", href: "/tickets", icon: Ticket },
   { label: "Customers", href: "/customers", icon: Users },
+  { label: "Onboarding", href: "/customer-onboarding", icon: UserCheck },
   { label: "Staff Performance", href: "/staff", icon: BarChart },
   { label: "HR & Leave", href: "/hr", icon: Calendar },
   { label: "Payslips", href: "/payslips", icon: Receipt },

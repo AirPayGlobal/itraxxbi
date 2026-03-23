@@ -17,6 +17,7 @@ const routeTitles: Record<string, string> = {
   "/tasks": "Tasks",
   "/jobcards": "Job Cards",
   "/customers": "Customers",
+  "/customer-onboarding": "Customer Onboarding",
   "/staff": "Staff Performance",
   "/hr": "HR & Leave",
   "/documents": "Documents",
