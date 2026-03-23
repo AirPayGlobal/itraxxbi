@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 120" fill="none">
+  <!-- ITRACKER text -->
+  <text x="10" y="62" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="48" letter-spacing="3">
+    <tspan fill="#3B82F6">I</tspan><tspan fill="#CBD5E1">TRACKER</tspan>
+  </text>
+  <!-- X with signal waves -->
+  <g transform="translate(355, 8)">
+    <!-- X letter -->
+    <text x="0" y="54" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="48" fill="#3B82F6">X</text>
+    <!-- Signal waves -->
+    <path d="M52 10 C56 6, 62 6, 66 10" stroke="#3B82F6" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+    <path d="M46 0 C53 -8, 65 -8, 72 0" stroke="#3B82F6" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+    <path d="M40 -8 C50 -20, 68 -20, 78 -8" stroke="#3B82F6" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.6"/>
+  </g>
+  <!-- TM -->
+  <text x="438" y="18" font-family="Arial, Helvetica, sans-serif" font-weight="400" font-size="11" fill="#64748B">TM</text>
+  <!-- Tagline -->
+  <text x="12" y="92" font-family="Arial, Helvetica, sans-serif" font-weight="400" font-size="16" letter-spacing="8" fill="#64748B">FLEET DATA INTELLIGENCE</text>
+</svg>

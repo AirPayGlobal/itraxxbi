@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
@@ -69,16 +70,25 @@ export function Sidebar({ collapsed, onToggle, onOpenCommand }: SidebarProps) {
       )}
     >
       {/* Brand / Logo */}
-      <div className="flex h-16 items-center border-b border-slate-700/60 px-4">
-        <Link href="/" className="flex items-center gap-2.5 overflow-hidden">
-          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-blue-600 font-bold text-white text-sm shadow-lg shadow-blue-500/30">
-            IX
-          </div>
-          {!collapsed && (
-            <span className="whitespace-nowrap text-lg font-bold tracking-tight">
-              <span className="text-blue-400">ITRACKER</span>
-              <span className="text-white">X</span>
-            </span>
+      <div className="flex h-16 items-center border-b border-slate-700/60 px-3">
+        <Link href="/" className="flex items-center gap-2 overflow-hidden">
+          {collapsed ? (
+            <Image
+              src="/logo-icon.svg"
+              alt="iTrackerX"
+              width={36}
+              height={36}
+              className="flex-shrink-0"
+            />
+          ) : (
+            <Image
+              src="/logo.svg"
+              alt="iTrackerX - Fleet Data Intelligence"
+              width={180}
+              height={44}
+              className="flex-shrink-0"
+              priority
+            />
           )}
         </Link>
       </div>

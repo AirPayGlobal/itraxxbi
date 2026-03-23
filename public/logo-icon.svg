@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none">
+  <!-- IX box -->
+  <rect x="0" y="0" width="40" height="40" rx="8" fill="#2563EB"/>
+  <!-- I -->
+  <text x="6" y="29" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="22" fill="white">I</text>
+  <!-- X -->
+  <text x="15" y="29" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="22" fill="white">X</text>
+  <!-- Signal waves -->
+  <path d="M30 12 C32.5 10, 35.5 10, 38 12" stroke="white" stroke-width="2" stroke-linecap="round" fill="none"/>
+  <path d="M28 7 C32 3, 36 3, 40 7" stroke="white" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.7"/>
+</svg>
