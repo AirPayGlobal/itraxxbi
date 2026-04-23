@@ -14,6 +14,7 @@ import {
 
 const routeTitles: Record<string, string> = {
   "/": "Dashboard",
+  "/projects": "Projects",
   "/tasks": "Tasks",
   "/jobcards": "Job Cards",
   "/customers": "Customers",

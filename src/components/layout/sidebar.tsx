@@ -25,10 +25,12 @@ import {
   MessageSquare,
   Funnel,
   UserCheck,
+  FolderKanban,
 } from "lucide-react";
 
 const navigationItems = [
   { label: "Dashboard", href: "/", icon: Home },
+  { label: "Projects", href: "/projects", icon: FolderKanban },
   { label: "Tasks", href: "/tasks", icon: CheckSquare },
   { label: "Job Cards", href: "/jobcards", icon: Wrench },
   { label: "Tickets", href: "/tickets", icon: Ticket },
