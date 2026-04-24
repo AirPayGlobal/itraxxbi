@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Building2,
   User,
@@ -111,6 +111,41 @@ function SaveBar({ onSave }: { onSave: () => void }) {
 
 function CompanyTab() {
   const [saved, setSaved] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("company-logo");
+    if (stored) setLogoUrl(stored);
+  }, []);
+
+  const handleLogoUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      alert("File must be under 2 MB.");
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      alert("Please upload an image file (PNG, JPG, SVG, etc.).");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      localStorage.setItem("company-logo", dataUrl);
+      setLogoUrl(dataUrl);
+      window.dispatchEvent(new Event("company-logo-changed"));
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  const handleRemoveLogo = useCallback(() => {
+    localStorage.removeItem("company-logo");
+    setLogoUrl(null);
+    window.dispatchEvent(new Event("company-logo-changed"));
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, []);
 
   const handleSave = () => {
     setSaved(true);
@@ -126,16 +161,43 @@ function CompanyTab() {
 
       {/* Logo */}
       <div className="mb-6 flex items-center gap-4">
-        <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-blue-600 text-xl font-bold text-white shadow">
-          IT
-        </div>
+        {logoUrl ? (
+          <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow">
+            <img src={logoUrl} alt="Company logo" className="h-full w-full object-contain" />
+          </div>
+        ) : (
+          <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-blue-600 text-xl font-bold text-white shadow">
+            IT
+          </div>
+        )}
         <div>
           <p className="text-sm font-medium text-slate-700">Company Logo</p>
-          <p className="mt-0.5 text-xs text-slate-400">PNG, JPG up to 2 MB. Recommended 256×256.</p>
-          <button className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition">
-            <Camera className="h-3.5 w-3.5" />
-            Upload Logo
-          </button>
+          <p className="mt-0.5 text-xs text-slate-400">PNG, JPG, or SVG up to 2 MB. Used in the sidebar and reports.</p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleLogoUpload}
+          />
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition"
+            >
+              <Camera className="h-3.5 w-3.5" />
+              {logoUrl ? "Change Logo" : "Upload Logo"}
+            </button>
+            {logoUrl && (
+              <button
+                onClick={handleRemoveLogo}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Remove
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

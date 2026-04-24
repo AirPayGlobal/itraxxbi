@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
@@ -57,11 +58,21 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle, onOpenCommand }: SidebarProps) {
   const pathname = usePathname();
+  const [customLogo, setCustomLogo] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCustomLogo(localStorage.getItem("company-logo"));
+    const handler = () => setCustomLogo(localStorage.getItem("company-logo"));
+    window.addEventListener("company-logo-changed", handler);
+    return () => window.removeEventListener("company-logo-changed", handler);
+  }, []);
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
     return pathname.startsWith(href);
   };
+
+  const logoSrc = customLogo || "/logo.svg";
 
   return (
     <aside
@@ -74,12 +85,18 @@ export function Sidebar({ collapsed, onToggle, onOpenCommand }: SidebarProps) {
       <div className={cn("flex items-center border-b border-slate-700/60", collapsed ? "h-16 justify-center px-2" : "h-20 px-4")}>
         <Link href="/" className="flex items-center overflow-hidden">
           {collapsed ? (
-            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-blue-600 shadow-lg shadow-blue-500/30">
-              <span className="text-sm font-bold text-white">IX</span>
-            </div>
+            customLogo ? (
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white shadow-lg">
+                <img src={customLogo} alt="Logo" className="h-full w-full object-contain" />
+              </div>
+            ) : (
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-blue-600 shadow-lg shadow-blue-500/30">
+                <span className="text-sm font-bold text-white">IX</span>
+              </div>
+            )
           ) : (
             <img
-              src="/logo.svg"
+              src={logoSrc}
               alt="iTrackerX — Fleet Data Intelligence"
               className="h-12 w-auto flex-shrink-0"
             />
