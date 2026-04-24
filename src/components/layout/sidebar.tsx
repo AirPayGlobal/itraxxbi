@@ -82,7 +82,7 @@ export function Sidebar({ collapsed, onToggle, onOpenCommand }: SidebarProps) {
       )}
     >
       {/* Brand / Logo */}
-      <div className={cn("flex items-center justify-center bg-white", collapsed ? "h-16 px-2" : "h-16 px-4")}>
+      <div className={cn("flex items-center justify-center bg-white", collapsed ? "h-16" : "h-16")}>
         <Link href="/" className="flex items-center overflow-hidden">
           {collapsed ? (
             customLogo ? (
