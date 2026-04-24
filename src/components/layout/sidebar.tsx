@@ -78,25 +78,11 @@ export function Sidebar({ collapsed, onToggle, onOpenCommand }: SidebarProps) {
               <span className="text-sm font-bold text-white">IX</span>
             </div>
           ) : (
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center">
-                <span className="text-xl font-bold tracking-wide">
-                  <span className="text-blue-400">I</span>
-                  <span className="text-slate-200">TRACKER</span>
-                  <span className="text-blue-400">X</span>
-                </span>
-                {/* Signal waves */}
-                <svg width="22" height="20" viewBox="0 0 22 20" fill="none" className="-ml-0.5 -mt-1 flex-shrink-0">
-                  <path d="M4 16 C8 10, 14 10, 18 16" stroke="#3B82F6" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
-                  <path d="M6.5 12 C9 8, 13 8, 15.5 12" stroke="#3B82F6" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
-                  <path d="M9 9 C10 7, 12 7, 13 9" stroke="#3B82F6" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
-                </svg>
-                <span className="ml-1 text-[9px] font-normal text-slate-500 align-super">TM</span>
-              </div>
-              <span className="text-[9px] font-medium tracking-[0.25em] text-slate-500">
-                FLEET DATA INTELLIGENCE
-              </span>
-            </div>
+            <img
+              src="/logo.svg"
+              alt="iTrackerX — Fleet Data Intelligence"
+              className="h-12 w-auto flex-shrink-0"
+            />
           )}
         </Link>
       </div>
