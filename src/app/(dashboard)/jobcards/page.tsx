@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { toast } from "sonner";
 import {
   Plus,
   Search,
@@ -593,12 +594,14 @@ export default function JobCardsPage() {
                         <div className="flex items-center justify-center gap-1">
                           <button
                             title="View"
+                            onClick={() => toast.info(`Viewing ${job.jobNumber} — ${job.title}`)}
                             className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-blue-600"
                           >
                             <Eye className="h-4 w-4" />
                           </button>
                           <button
                             title="Edit"
+                            onClick={() => toast.info(`Editing ${job.jobNumber} — coming soon`)}
                             className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-amber-600"
                           >
                             <Pencil className="h-4 w-4" />

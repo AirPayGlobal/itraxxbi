@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { toast } from "sonner";
 import {
   Plus,
   Search,
@@ -737,6 +738,7 @@ export default function TasksPage() {
                             </button>
                             <button
                               title="Edit"
+                              onClick={() => { setSelectedTask(task); toast.info(`Editing ${task.id}`); }}
                               className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-amber-600"
                             >
                               <Pencil className="h-4 w-4" />
@@ -1018,7 +1020,10 @@ export default function TasksPage() {
               >
                 Close
               </button>
-              <button className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+              <button
+                onClick={() => toast.info(`Edit mode for ${selectedTask?.id} — coming soon`)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              >
                 <Pencil className="h-3.5 w-3.5" />
                 Edit Task
               </button>

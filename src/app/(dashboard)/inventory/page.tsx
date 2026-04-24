@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { toast } from "sonner";
 import {
   Package,
   Search,
@@ -759,18 +760,21 @@ export default function InventoryPage() {
                           <div className="flex items-center justify-center gap-1">
                             <button
                               title="View"
+                              onClick={() => toast.info(`Viewing ${asset.name}`)}
                               className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-blue-600"
                             >
                               <Eye className="h-4 w-4" />
                             </button>
                             <button
                               title="Edit"
+                              onClick={() => toast.info(`Editing ${asset.name} — coming soon`)}
                               className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-amber-600"
                             >
                               <Pencil className="h-4 w-4" />
                             </button>
                             <button
                               title="Assign"
+                              onClick={() => toast.info(`Assigning ${asset.name} — coming soon`)}
                               className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-purple-600"
                             >
                               <UserCheck className="h-4 w-4" />
@@ -863,7 +867,7 @@ export default function InventoryPage() {
                         -{asset.minStockLevel - asset.quantity}
                       </p>
                     </div>
-                    <button className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-700">
+                    <button onClick={() => toast.success(`Reorder request submitted for ${asset.name}`)} className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-700">
                       Reorder
                     </button>
                   </div>

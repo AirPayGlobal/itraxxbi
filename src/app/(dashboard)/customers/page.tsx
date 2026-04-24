@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { toast } from "sonner";
 import {
   Users,
   FileText,
@@ -368,11 +369,11 @@ export default function CustomersPage() {
 
               {/* Action Buttons */}
               <div className="flex gap-2">
-                <button className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50">
+                <button onClick={() => toast.info(`Viewing ${customer.name}`)} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50">
                   <Users className="h-4 w-4" />
                   View Details
                 </button>
-                <button className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700">
+                <button onClick={() => toast.info(`New job card for ${customer.name} — coming soon`)} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700">
                   <ClipboardList className="h-4 w-4" />
                   Add Job Card
                 </button>

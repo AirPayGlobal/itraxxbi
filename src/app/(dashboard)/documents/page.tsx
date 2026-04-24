@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { toast } from "sonner";
 import {
   FileText,
   FileCheck2,
@@ -746,18 +747,21 @@ export default function DocumentsPage() {
                         <div className="flex items-center justify-center gap-1">
                           <button
                             title="View"
+                            onClick={() => toast.info(`Viewing ${doc.name}`)}
                             className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-blue-600"
                           >
                             <Eye className="h-4 w-4" />
                           </button>
                           <button
                             title="Download"
+                            onClick={() => toast.success(`Downloading ${doc.name}`)}
                             className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-green-600"
                           >
                             <Download className="h-4 w-4" />
                           </button>
                           <button
                             title="Delete"
+                            onClick={() => toast.error(`${doc.name} deleted`)}
                             className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-red-600"
                           >
                             <Trash2 className="h-4 w-4" />

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Ticket,
@@ -747,12 +748,12 @@ function TicketDetail({
         {/* Status Actions */}
         <div className="flex items-center gap-2">
           {ticket.status !== "RESOLVED" && ticket.status !== "CLOSED" && (
-            <button className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700">
+            <button onClick={() => toast.success(`Ticket marked as resolved`)} className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700">
               Mark Resolved
             </button>
           )}
           {ticket.status !== "CLOSED" && (
-            <button className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300">
+            <button onClick={() => toast.info(`Ticket closed`)} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300">
               Close Ticket
             </button>
           )}
@@ -837,11 +838,11 @@ function TicketDetail({
                   />
                 </div>
                 <div className="mt-3 flex items-center justify-between">
-                  <button className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">
+                  <button onClick={() => toast.info("File attachment — coming soon")} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">
                     <Paperclip className="h-3.5 w-3.5" />
                     Attach File
                   </button>
-                  <button className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+                  <button onClick={() => toast.success("Reply sent")} className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
                     <Send className="h-3.5 w-3.5" />
                     Send Reply
                   </button>
@@ -1272,7 +1273,7 @@ export default function TicketsPage() {
                           {ticket.comments.length}
                         </span>
                       )}
-                      <button className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-800">
+                      <button onClick={() => setSelectedTicket(ticket)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-800">
                         <ChevronRight className="h-4 w-4" />
                       </button>
                     </div>

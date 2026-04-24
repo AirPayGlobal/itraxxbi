@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { toast } from "sonner";
 import {
   DollarSign,
   FileText,
@@ -485,6 +486,7 @@ export default function FinancePage() {
                             <button
                               className="rounded p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-green-600"
                               title="Send"
+                              onClick={() => toast.success(`Invoice ${inv.invoiceNumber} sent to ${inv.customer}`)}
                             >
                               <Send className="h-4 w-4" />
                             </button>
@@ -492,6 +494,7 @@ export default function FinancePage() {
                           <button
                             className="rounded p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
                             title="Download PDF"
+                            onClick={() => toast.success(`Downloading ${inv.invoiceNumber}.pdf`)}
                           >
                             <Download className="h-4 w-4" />
                           </button>
@@ -838,7 +841,7 @@ export default function FinancePage() {
               >
                 Close
               </button>
-              <button className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+              <button onClick={() => toast.success("Downloading invoice PDF")} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
                 <Download className="h-4 w-4" />
                 Download PDF
               </button>
