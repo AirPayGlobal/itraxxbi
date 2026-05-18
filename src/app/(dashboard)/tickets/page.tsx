@@ -443,7 +443,13 @@ function StatCard({
 // Create Ticket Modal
 // ---------------------------------------------------------------------------
 
-function CreateTicketModal({ onClose }: { onClose: () => void }) {
+function CreateTicketModal({
+  onClose,
+  onCreate,
+}: {
+  onClose: () => void;
+  onCreate: (ticket: SupportTicket) => void;
+}) {
   const [form, setForm] = useState({
     subject: "",
     description: "",
@@ -676,7 +682,30 @@ function CreateTicketModal({ onClose }: { onClose: () => void }) {
             Cancel
           </button>
           <button
-            onClick={onClose}
+            onClick={() => {
+              const now = new Date().toISOString();
+              const ticketNum = `TK-2026-${String(Math.floor(1000 + Math.random() * 9000))}`;
+              const newTicket: SupportTicket = {
+                id: crypto.randomUUID(),
+                ticketNumber: ticketNum,
+                subject: form.subject,
+                description: form.description,
+                status: "OPEN",
+                priority: form.priority,
+                category: form.category,
+                customer: form.customer,
+                company: form.company,
+                email: form.email,
+                phone: form.phone,
+                assignedTo: null,
+                vehicleReg: form.vehicleReg || null,
+                comments: [],
+                createdAt: now,
+                updatedAt: now,
+                resolvedAt: null,
+              };
+              onCreate(newTicket);
+            }}
             className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
           >
             <Send className="h-4 w-4" />
@@ -695,9 +724,13 @@ function CreateTicketModal({ onClose }: { onClose: () => void }) {
 function TicketDetail({
   ticket,
   onBack,
+  onUpdateStatus,
+  onAddComment,
 }: {
   ticket: SupportTicket;
   onBack: () => void;
+  onUpdateStatus: (ticketId: string, status: TicketStatus) => void;
+  onAddComment: (ticketId: string, comment: TicketComment) => void;
 }) {
   const [reply, setReply] = useState("");
 
@@ -748,12 +781,12 @@ function TicketDetail({
         {/* Status Actions */}
         <div className="flex items-center gap-2">
           {ticket.status !== "RESOLVED" && ticket.status !== "CLOSED" && (
-            <button onClick={() => toast.success(`Ticket marked as resolved`)} className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700">
+            <button onClick={() => onUpdateStatus(ticket.id, "RESOLVED")} className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700">
               Mark Resolved
             </button>
           )}
           {ticket.status !== "CLOSED" && (
-            <button onClick={() => toast.info(`Ticket closed`)} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300">
+            <button onClick={() => onUpdateStatus(ticket.id, "CLOSED")} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300">
               Close Ticket
             </button>
           )}
@@ -842,7 +875,22 @@ function TicketDetail({
                     <Paperclip className="h-3.5 w-3.5" />
                     Attach File
                   </button>
-                  <button onClick={() => toast.success("Reply sent")} className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+                  <button
+                    onClick={() => {
+                      if (!reply.trim()) return;
+                      const newComment: TicketComment = {
+                        id: crypto.randomUUID(),
+                        author: "Support Agent",
+                        role: "agent",
+                        message: reply.trim(),
+                        createdAt: new Date().toISOString(),
+                      };
+                      onAddComment(ticket.id, newComment);
+                      setReply("");
+                      toast.success("Reply sent");
+                    }}
+                    className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                  >
                     <Send className="h-3.5 w-3.5" />
                     Send Reply
                   </button>
@@ -990,6 +1038,7 @@ function TicketDetail({
 // ---------------------------------------------------------------------------
 
 export default function TicketsPage() {
+  const [tickets, setTickets] = useState<SupportTicket[]>(mockTickets);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<TicketStatus | "ALL">("ALL");
   const [priorityFilter, setPriorityFilter] = useState<
@@ -1005,7 +1054,7 @@ export default function TicketsPage() {
   );
 
   const filteredTickets = useMemo(() => {
-    return mockTickets.filter((ticket) => {
+    return tickets.filter((ticket) => {
       const matchesSearch =
         ticket.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
         ticket.ticketNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1019,18 +1068,69 @@ export default function TicketsPage() {
         categoryFilter === "ALL" || ticket.category === categoryFilter;
       return matchesSearch && matchesStatus && matchesPriority && matchesCategory;
     });
-  }, [searchQuery, statusFilter, priorityFilter, categoryFilter]);
+  }, [tickets, searchQuery, statusFilter, priorityFilter, categoryFilter]);
 
   const stats = useMemo(() => {
     return {
-      open: mockTickets.filter((t) => t.status === "OPEN").length,
-      inProgress: mockTickets.filter((t) => t.status === "IN_PROGRESS").length,
-      waiting: mockTickets.filter((t) => t.status === "WAITING").length,
-      resolved: mockTickets.filter(
+      open: tickets.filter((t) => t.status === "OPEN").length,
+      inProgress: tickets.filter((t) => t.status === "IN_PROGRESS").length,
+      waiting: tickets.filter((t) => t.status === "WAITING").length,
+      resolved: tickets.filter(
         (t) => t.status === "RESOLVED" || t.status === "CLOSED"
       ).length,
     };
-  }, []);
+  }, [tickets]);
+
+  const handleUpdateStatus = (ticketId: string, status: TicketStatus) => {
+    const now = new Date().toISOString();
+    setTickets((prev) =>
+      prev.map((t) =>
+        t.id === ticketId
+          ? {
+              ...t,
+              status,
+              updatedAt: now,
+              resolvedAt:
+                status === "RESOLVED" || status === "CLOSED"
+                  ? now
+                  : t.resolvedAt,
+            }
+          : t
+      )
+    );
+    setSelectedTicket((prev) =>
+      prev && prev.id === ticketId
+        ? {
+            ...prev,
+            status,
+            updatedAt: now,
+            resolvedAt:
+              status === "RESOLVED" || status === "CLOSED"
+                ? now
+                : prev.resolvedAt,
+          }
+        : prev
+    );
+    toast.success(
+      status === "RESOLVED" ? "Ticket marked as resolved" : "Ticket closed"
+    );
+  };
+
+  const handleAddComment = (ticketId: string, comment: TicketComment) => {
+    const now = new Date().toISOString();
+    setTickets((prev) =>
+      prev.map((t) =>
+        t.id === ticketId
+          ? { ...t, comments: [...t.comments, comment], updatedAt: now }
+          : t
+      )
+    );
+    setSelectedTicket((prev) =>
+      prev && prev.id === ticketId
+        ? { ...prev, comments: [...prev.comments, comment], updatedAt: now }
+        : prev
+    );
+  };
 
   // Detail View
   if (selectedTicket) {
@@ -1039,6 +1139,8 @@ export default function TicketsPage() {
         <TicketDetail
           ticket={selectedTicket}
           onBack={() => setSelectedTicket(null)}
+          onUpdateStatus={handleUpdateStatus}
+          onAddComment={handleAddComment}
         />
       </div>
     );
@@ -1384,7 +1486,14 @@ export default function TicketsPage() {
       {/* Create Modal */}
       <AnimatePresence>
         {showCreate && (
-          <CreateTicketModal onClose={() => setShowCreate(false)} />
+          <CreateTicketModal
+            onClose={() => setShowCreate(false)}
+            onCreate={(newTicket) => {
+              setTickets((prev) => [newTicket, ...prev]);
+              toast.success("Ticket created successfully");
+              setShowCreate(false);
+            }}
+          />
         )}
       </AnimatePresence>
     </div>

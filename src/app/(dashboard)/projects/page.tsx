@@ -20,6 +20,7 @@ import {
   LayoutList,
 } from "lucide-react";
 import { cn, formatDate, getStatusColor } from "@/lib/utils";
+import { toast } from "sonner";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -66,7 +67,7 @@ const TEAM_MEMBERS = [
   "David Kapere",
 ];
 
-const mockProjects: Project[] = [
+const initialProjects: Project[] = [
   {
     id: "PRJ-001",
     name: "Fleet Tracker V3 Rollout",
@@ -378,10 +379,11 @@ function GanttChartView({ project }: { project: Project }) {
 // ---------------------------------------------------------------------------
 
 export default function ProjectsPage() {
+  const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "gantt">("gantt");
-  const [expandedProject, setExpandedProject] = useState<string | null>(mockProjects[0].id);
+  const [expandedProject, setExpandedProject] = useState<string | null>(initialProjects[0].id);
   const [showNewModal, setShowNewModal] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -393,7 +395,7 @@ export default function ProjectsPage() {
   });
 
   const filteredProjects = useMemo(() => {
-    return mockProjects.filter((p) => {
+    return projects.filter((p) => {
       const filterMap: Record<string, string> = {
         All: "All", Planning: "PLANNING", Active: "ACTIVE",
         "On Hold": "ON_HOLD", Completed: "COMPLETED", Archived: "ARCHIVED",
@@ -408,7 +410,7 @@ export default function ProjectsPage() {
         p.description.toLowerCase().includes(query);
       return matchesStatus && matchesSearch;
     });
-  }, [statusFilter, searchQuery]);
+  }, [projects, statusFilter, searchQuery]);
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -416,6 +418,20 @@ export default function ProjectsPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const newProject: Project = {
+      id: `PRJ-${String(projects.length + 1).padStart(3, "0")}`,
+      name: formData.name,
+      description: formData.description,
+      status: "ACTIVE",
+      priority: formData.priority as Priority,
+      owner: formData.owner,
+      team: [formData.owner],
+      startDate: formData.startDate,
+      endDate: formData.endDate,
+      tasks: [],
+    };
+    setProjects((prev) => [...prev, newProject]);
+    toast.success("Project created");
     setShowNewModal(false);
     setFormData({ name: "", description: "", priority: "MEDIUM", owner: "", startDate: "", endDate: "" });
   };
@@ -423,19 +439,19 @@ export default function ProjectsPage() {
   const stats = [
     {
       label: "Total Projects",
-      value: mockProjects.length.toString(),
+      value: projects.length.toString(),
       icon: FolderKanban,
       color: "text-blue-600 bg-blue-50",
     },
     {
       label: "Active",
-      value: mockProjects.filter((p) => p.status === "ACTIVE").length.toString(),
+      value: projects.filter((p) => p.status === "ACTIVE").length.toString(),
       icon: Clock,
       color: "text-emerald-600 bg-emerald-50",
     },
     {
       label: "Completed",
-      value: mockProjects.filter((p) => p.status === "COMPLETED").length.toString(),
+      value: projects.filter((p) => p.status === "COMPLETED").length.toString(),
       icon: CheckCircle2,
       color: "text-green-600 bg-green-50",
     },

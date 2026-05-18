@@ -219,26 +219,38 @@ const tabs = ["Invoices", "Expenses", "Reports"] as const;
 // Page
 // ---------------------------------------------------------------------------
 
+const initialInvoiceForm = {
+  customer: "",
+  jobCard: "",
+  subtotal: "",
+  tax: "",
+  issuedDate: "",
+  dueDate: "",
+  notes: "",
+};
+
 export default function FinancePage() {
   const [activeTab, setActiveTab] = useState<string>("Invoices");
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [showNewInvoice, setShowNewInvoice] = useState(false);
   const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null);
+  const [invoices, setInvoices] = useState<Invoice[]>(mockInvoices);
+  const [invoiceForm, setInvoiceForm] = useState(initialInvoiceForm);
 
-  const totalRevenue = mockInvoices
+  const totalRevenue = invoices
     .filter((i) => i.status === "PAID")
     .reduce((sum, i) => sum + i.total, 0);
-  const totalOutstanding = mockInvoices
+  const totalOutstanding = invoices
     .filter((i) => ["SENT", "OVERDUE", "PARTIAL"].includes(i.status))
     .reduce((sum, i) => sum + i.total, 0);
   const totalExpenses = mockExpenses
     .filter((e) => e.approved)
     .reduce((sum, e) => sum + e.amount, 0);
-  const overdueCount = mockInvoices.filter((i) => i.status === "OVERDUE").length;
+  const overdueCount = invoices.filter((i) => i.status === "OVERDUE").length;
 
   const filteredInvoices = useMemo(() => {
-    return mockInvoices.filter((inv) => {
+    return invoices.filter((inv) => {
       const matchesStatus =
         statusFilter === "All" || inv.status === statusFilter.toUpperCase();
       const query = searchQuery.toLowerCase();
@@ -248,7 +260,7 @@ export default function FinancePage() {
         inv.customer.toLowerCase().includes(query);
       return matchesStatus && matchesSearch;
     });
-  }, [statusFilter, searchQuery]);
+  }, [statusFilter, searchQuery, invoices]);
 
   const filteredExpenses = useMemo(() => {
     const query = searchQuery.toLowerCase();
@@ -260,6 +272,49 @@ export default function FinancePage() {
         exp.category.toLowerCase().includes(query)
     );
   }, [searchQuery]);
+
+  const handleSubtotalChange = (value: string) => {
+    const subtotalNum = parseFloat(value) || 0;
+    const tax = (subtotalNum * 0.15).toFixed(2);
+    setInvoiceForm((prev) => ({ ...prev, subtotal: value, tax }));
+  };
+
+  const handleCreateInvoice = (e: React.FormEvent) => {
+    e.preventDefault();
+    const subtotal = parseFloat(invoiceForm.subtotal) || 0;
+    const tax = parseFloat(invoiceForm.tax) || 0;
+    const total = subtotal + tax;
+    const seqNum = String(invoices.length + 1).padStart(4, "0");
+    const newInvoice: Invoice = {
+      id: String(Date.now()),
+      invoiceNumber: `INV-2026-${seqNum}`,
+      customer: invoiceForm.customer,
+      jobCard: invoiceForm.jobCard || null,
+      subtotal,
+      tax,
+      total,
+      status: "DRAFT",
+      issuedDate: invoiceForm.issuedDate || new Date().toISOString().slice(0, 10),
+      dueDate: invoiceForm.dueDate || "",
+      paidDate: null,
+    };
+    setInvoices((prev) => [newInvoice, ...prev]);
+    toast.success("Invoice created successfully");
+    setShowNewInvoice(false);
+    setInvoiceForm(initialInvoiceForm);
+  };
+
+  const handleSendInvoice = (invoiceId: string) => {
+    setInvoices((prev) =>
+      prev.map((inv) =>
+        inv.id === invoiceId ? { ...inv, status: "SENT" } : inv
+      )
+    );
+    const inv = invoices.find((i) => i.id === invoiceId);
+    if (inv) {
+      toast.success(`Invoice ${inv.invoiceNumber} sent to ${inv.customer}`);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 p-6 lg:p-8">
@@ -315,7 +370,7 @@ export default function FinancePage() {
             </div>
           </div>
           <div className="mt-2 flex items-center gap-1 text-xs text-slate-500">
-            <span>{mockInvoices.filter((i) => ["SENT", "OVERDUE", "PARTIAL"].includes(i.status)).length} pending invoices</span>
+            <span>{invoices.filter((i) => ["SENT", "OVERDUE", "PARTIAL"].includes(i.status)).length} pending invoices</span>
           </div>
         </div>
 
@@ -348,7 +403,7 @@ export default function FinancePage() {
             </div>
           </div>
           <div className="mt-2 flex items-center gap-1 text-xs text-red-500">
-            <span>{formatCurrency(mockInvoices.filter((i) => i.status === "OVERDUE").reduce((s, i) => s + i.total, 0))} overdue</span>
+            <span>{formatCurrency(invoices.filter((i) => i.status === "OVERDUE").reduce((s, i) => s + i.total, 0))} overdue</span>
           </div>
         </div>
       </div>
@@ -486,7 +541,7 @@ export default function FinancePage() {
                             <button
                               className="rounded p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-green-600"
                               title="Send"
-                              onClick={() => toast.success(`Invoice ${inv.invoiceNumber} sent to ${inv.customer}`)}
+                              onClick={() => handleSendInvoice(inv.id)}
                             >
                               <Send className="h-4 w-4" />
                             </button>
@@ -863,18 +918,18 @@ export default function FinancePage() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                setShowNewInvoice(false);
-              }}
-            >
+            <form onSubmit={handleCreateInvoice}>
               <div className="max-h-[65vh] space-y-4 overflow-y-auto px-6 py-4">
                 <div>
                   <label className="mb-1 block text-sm font-medium text-slate-700">
                     Customer <span className="text-red-500">*</span>
                   </label>
-                  <select className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                  <select
+                    required
+                    value={invoiceForm.customer}
+                    onChange={(e) => setInvoiceForm((prev) => ({ ...prev, customer: e.target.value }))}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
                     <option value="">Select customer...</option>
                     <option>Namibia Breweries Ltd</option>
                     <option>TransNamib Holdings</option>
@@ -888,7 +943,11 @@ export default function FinancePage() {
                   <label className="mb-1 block text-sm font-medium text-slate-700">
                     Job Card (optional)
                   </label>
-                  <select className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                  <select
+                    value={invoiceForm.jobCard}
+                    onChange={(e) => setInvoiceForm((prev) => ({ ...prev, jobCard: e.target.value }))}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
                     <option value="">Select job card...</option>
                     <option>JC-2602-0001</option>
                     <option>JC-2602-0002</option>
@@ -904,6 +963,8 @@ export default function FinancePage() {
                       type="number"
                       required
                       placeholder="0.00"
+                      value={invoiceForm.subtotal}
+                      onChange={(e) => handleSubtotalChange(e.target.value)}
                       className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
                   </div>
@@ -915,6 +976,7 @@ export default function FinancePage() {
                       type="number"
                       placeholder="Auto-calculated"
                       disabled
+                      value={invoiceForm.tax}
                       className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500"
                     />
                   </div>
@@ -924,6 +986,8 @@ export default function FinancePage() {
                     <label className="mb-1 block text-sm font-medium text-slate-700">Issue Date</label>
                     <input
                       type="date"
+                      value={invoiceForm.issuedDate}
+                      onChange={(e) => setInvoiceForm((prev) => ({ ...prev, issuedDate: e.target.value }))}
                       className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
                   </div>
@@ -931,6 +995,8 @@ export default function FinancePage() {
                     <label className="mb-1 block text-sm font-medium text-slate-700">Due Date</label>
                     <input
                       type="date"
+                      value={invoiceForm.dueDate}
+                      onChange={(e) => setInvoiceForm((prev) => ({ ...prev, dueDate: e.target.value }))}
                       className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
                   </div>
@@ -940,6 +1006,8 @@ export default function FinancePage() {
                   <textarea
                     rows={3}
                     placeholder="Invoice notes..."
+                    value={invoiceForm.notes}
+                    onChange={(e) => setInvoiceForm((prev) => ({ ...prev, notes: e.target.value }))}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
@@ -947,7 +1015,7 @@ export default function FinancePage() {
               <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
                 <button
                   type="button"
-                  onClick={() => setShowNewInvoice(false)}
+                  onClick={() => { setShowNewInvoice(false); setInvoiceForm(initialInvoiceForm); }}
                   className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
                 >
                   Cancel

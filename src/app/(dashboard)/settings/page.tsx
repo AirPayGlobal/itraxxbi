@@ -26,6 +26,7 @@ import {
   Plus,
 } from "lucide-react";
 import { cn, getInitials } from "@/lib/utils";
+import { toast } from "sonner";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -114,6 +115,19 @@ function CompanyTab() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [companyName, setCompanyName] = useState("iTraxx BI");
+  const [regNumber, setRegNumber] = useState("CC/2022/004812");
+  const [industry, setIndustry] = useState("fleet");
+  const [companySize, setCompanySize] = useState("11-50");
+  const [primaryEmail, setPrimaryEmail] = useState("info@itraxxbi.com.na");
+  const [phoneNumber, setPhoneNumber] = useState("+264 61 000 0000");
+  const [website, setWebsite] = useState("https://itraxxbi.com.na");
+  const [country, setCountry] = useState("NA");
+  const [address, setAddress] = useState("12 Independence Ave, Windhoek, 10001");
+  const [vatNumber, setVatNumber] = useState("NAM-VAT-00123456");
+  const [currency, setCurrency] = useState("NAD");
+  const [timezone, setTimezone] = useState("Africa/Windhoek");
+
   useEffect(() => {
     const stored = localStorage.getItem("company-logo");
     if (stored) setLogoUrl(stored);
@@ -149,6 +163,7 @@ function CompanyTab() {
 
   const handleSave = () => {
     setSaved(true);
+    toast.success("Company profile saved successfully.");
     setTimeout(() => setSaved(false), 2500);
   };
 
@@ -203,13 +218,13 @@ function CompanyTab() {
 
       <div className="grid gap-5 sm:grid-cols-2">
         <Field label="Company Name">
-          <input className={inputCls} defaultValue="iTraxx BI" />
+          <input className={inputCls} value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
         </Field>
         <Field label="Registration Number">
-          <input className={inputCls} defaultValue="CC/2022/004812" />
+          <input className={inputCls} value={regNumber} onChange={(e) => setRegNumber(e.target.value)} />
         </Field>
         <Field label="Industry">
-          <select className={selectCls} defaultValue="fleet">
+          <select className={selectCls} value={industry} onChange={(e) => setIndustry(e.target.value)}>
             <option value="fleet">Fleet Management & Telematics</option>
             <option value="logistics">Logistics & Transport</option>
             <option value="construction">Construction</option>
@@ -218,7 +233,7 @@ function CompanyTab() {
           </select>
         </Field>
         <Field label="Company Size">
-          <select className={selectCls} defaultValue="11-50">
+          <select className={selectCls} value={companySize} onChange={(e) => setCompanySize(e.target.value)}>
             <option value="1-10">1 – 10 employees</option>
             <option value="11-50">11 – 50 employees</option>
             <option value="51-200">51 – 200 employees</option>
@@ -228,23 +243,23 @@ function CompanyTab() {
         <Field label="Primary Email">
           <div className="relative">
             <Mail className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <input className={cn(inputCls, "pl-9")} defaultValue="info@itraxxbi.com.na" />
+            <input className={cn(inputCls, "pl-9")} value={primaryEmail} onChange={(e) => setPrimaryEmail(e.target.value)} />
           </div>
         </Field>
         <Field label="Phone Number">
           <div className="relative">
             <Phone className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <input className={cn(inputCls, "pl-9")} defaultValue="+264 61 000 0000" />
+            <input className={cn(inputCls, "pl-9")} value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} />
           </div>
         </Field>
         <Field label="Website">
           <div className="relative">
             <Globe className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <input className={cn(inputCls, "pl-9")} defaultValue="https://itraxxbi.com.na" />
+            <input className={cn(inputCls, "pl-9")} value={website} onChange={(e) => setWebsite(e.target.value)} />
           </div>
         </Field>
         <Field label="Country / Region">
-          <select className={selectCls} defaultValue="NA">
+          <select className={selectCls} value={country} onChange={(e) => setCountry(e.target.value)}>
             <option value="NA">Namibia</option>
             <option value="ZA">South Africa</option>
             <option value="BW">Botswana</option>
@@ -257,15 +272,16 @@ function CompanyTab() {
             <MapPin className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <input
               className={cn(inputCls, "pl-9")}
-              defaultValue="12 Independence Ave, Windhoek, 10001"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
             />
           </div>
         </Field>
         <Field label="VAT / Tax Number">
-          <input className={inputCls} defaultValue="NAM-VAT-00123456" />
+          <input className={inputCls} value={vatNumber} onChange={(e) => setVatNumber(e.target.value)} />
         </Field>
         <Field label="Default Currency">
-          <select className={selectCls} defaultValue="NAD">
+          <select className={selectCls} value={currency} onChange={(e) => setCurrency(e.target.value)}>
             <option value="NAD">NAD – Namibian Dollar</option>
             <option value="ZAR">ZAR – South African Rand</option>
             <option value="USD">USD – US Dollar</option>
@@ -273,7 +289,7 @@ function CompanyTab() {
           </select>
         </Field>
         <Field label="Timezone">
-          <select className={selectCls} defaultValue="Africa/Windhoek">
+          <select className={selectCls} value={timezone} onChange={(e) => setTimezone(e.target.value)}>
             <option value="Africa/Windhoek">Africa/Windhoek (WAT +02:00)</option>
             <option value="Africa/Johannesburg">Africa/Johannesburg (SAST +02:00)</option>
             <option value="Africa/Harare">Africa/Harare (CAT +02:00)</option>
@@ -299,9 +315,36 @@ function CompanyTab() {
 
 function AccountTab() {
   const [saved, setSaved] = useState(false);
+  const [firstName, setFirstName] = useState("Admin");
+  const [lastName, setLastName] = useState("User");
+  const [email, setEmail] = useState("admin@itraxxbi.com.na");
+  const [phone, setPhone] = useState("+264 81 000 0000");
+  const [language, setLanguage] = useState("en");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAvatarUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("File must be under 2 MB.");
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload an image file.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setAvatarUrl(reader.result as string);
+      toast.success("Profile photo updated.");
+    };
+    reader.readAsDataURL(file);
+  }, []);
 
   const handleSave = () => {
     setSaved(true);
+    toast.success("Account details updated.");
     setTimeout(() => setSaved(false), 2500);
   };
 
@@ -311,12 +354,28 @@ function AccountTab() {
 
       {/* Avatar */}
       <div className="mb-6 flex items-center gap-4">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-500 text-lg font-bold text-white">
-          {getInitials("Admin User")}
-        </div>
+        {avatarUrl ? (
+          <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white shadow">
+            <img src={avatarUrl} alt="Profile" className="h-full w-full object-cover" />
+          </div>
+        ) : (
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-500 text-lg font-bold text-white">
+            {getInitials(`${firstName} ${lastName}`)}
+          </div>
+        )}
         <div>
           <p className="text-sm font-medium text-slate-700">Profile Photo</p>
-          <button className="mt-1 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition">
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleAvatarUpload}
+          />
+          <button
+            onClick={() => avatarInputRef.current?.click()}
+            className="mt-1 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition"
+          >
             <Camera className="h-3.5 w-3.5" />
             Change Photo
           </button>
@@ -325,28 +384,28 @@ function AccountTab() {
 
       <div className="grid gap-5 sm:grid-cols-2">
         <Field label="First Name">
-          <input className={inputCls} defaultValue="Admin" />
+          <input className={inputCls} value={firstName} onChange={(e) => setFirstName(e.target.value)} />
         </Field>
         <Field label="Last Name">
-          <input className={inputCls} defaultValue="User" />
+          <input className={inputCls} value={lastName} onChange={(e) => setLastName(e.target.value)} />
         </Field>
         <Field label="Email Address">
           <div className="relative">
             <Mail className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <input className={cn(inputCls, "pl-9")} defaultValue="admin@itraxxbi.com.na" />
+            <input className={cn(inputCls, "pl-9")} value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
         </Field>
         <Field label="Phone">
           <div className="relative">
             <Phone className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <input className={cn(inputCls, "pl-9")} defaultValue="+264 81 000 0000" />
+            <input className={cn(inputCls, "pl-9")} value={phone} onChange={(e) => setPhone(e.target.value)} />
           </div>
         </Field>
         <Field label="Role">
-          <input className={cn(inputCls, "bg-slate-50 text-slate-500")} defaultValue="Super Admin" disabled />
+          <input className={cn(inputCls, "bg-slate-50 text-slate-500")} value="Super Admin" disabled />
         </Field>
         <Field label="Language">
-          <select className={selectCls} defaultValue="en">
+          <select className={selectCls} value={language} onChange={(e) => setLanguage(e.target.value)}>
             <option value="en">English</option>
             <option value="af">Afrikaans</option>
             <option value="de">German</option>
@@ -627,15 +686,24 @@ function IntegrationsTab() {
                       <div className="mt-3 flex items-center gap-2">
                         {intg.status === "connected" ? (
                           <>
-                            <button className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition">
+                            <button
+                              onClick={() => toast.info(`${intg.name} configuration panel — coming soon`)}
+                              className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition"
+                            >
                               Configure
                             </button>
-                            <button className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition">
+                            <button
+                              onClick={() => toast.info(`${intg.name} disconnected`)}
+                              className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition"
+                            >
                               Disconnect
                             </button>
                           </>
                         ) : (
-                          <button className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition">
+                          <button
+                            onClick={() => toast.info(`Connecting to ${intg.name} — coming soon`)}
+                            className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition"
+                          >
                             {intg.status === "error" ? "Reconnect" : "Connect"}
                           </button>
                         )}
@@ -682,10 +750,16 @@ function BillingTab() {
           </div>
         </div>
         <div className="mt-4 flex items-center gap-3">
-          <button className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition">
+          <button
+            onClick={() => toast.info("Contact sales for enterprise pricing")}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition"
+          >
             Upgrade to Enterprise
           </button>
-          <button className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition">
+          <button
+            onClick={() => toast.info("Plan comparison — coming soon")}
+            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition"
+          >
             View All Plans
           </button>
         </div>
@@ -729,7 +803,7 @@ function BillingTab() {
               <p className="text-xs text-slate-400">Expires 08 / 2028</p>
             </div>
           </div>
-          <button className="text-sm font-medium text-blue-600 hover:underline">Update</button>
+          <button onClick={() => toast.info("Payment method update — coming soon")} className="text-sm font-medium text-blue-600 hover:underline">Update</button>
         </div>
       </div>
 
@@ -759,7 +833,7 @@ function BillingTab() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button className="text-xs font-medium text-blue-600 hover:underline">Download</button>
+                    <button onClick={() => toast.success(`Downloading invoice ${inv.id}...`)} className="text-xs font-medium text-blue-600 hover:underline">Download</button>
                   </td>
                 </tr>
               ))}
@@ -904,6 +978,45 @@ function SecurityTab() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [twoFa, setTwoFa] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [activeSessions, setActiveSessions] = useState(sessions);
+
+  const handleUpdatePassword = () => {
+    if (!currentPassword) {
+      toast.error("Please enter your current password.");
+      return;
+    }
+    if (newPassword.length < 8) {
+      toast.error("New password must be at least 8 characters.");
+      return;
+    }
+    if (!/\d/.test(newPassword) || !/[^a-zA-Z0-9]/.test(newPassword)) {
+      toast.error("New password must include a number and a symbol.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("New password and confirmation do not match.");
+      return;
+    }
+    setSaved(true);
+    toast.success("Password updated successfully.");
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setTimeout(() => setSaved(false), 2500);
+  };
+
+  const handleRevokeSession = (sessionId: string) => {
+    setActiveSessions((prev) => prev.filter((s) => s.id !== sessionId));
+    toast.success("Session revoked.");
+  };
+
+  const handleRevokeAllOther = () => {
+    setActiveSessions((prev) => prev.filter((s) => s.current));
+    toast.success("All other sessions revoked.");
+  };
 
   return (
     <div>
@@ -919,6 +1032,8 @@ function SecurityTab() {
                 type={showCurrent ? "text" : "password"}
                 className={cn(inputCls, "pr-10")}
                 placeholder="••••••••"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
               />
               <button
                 onClick={() => setShowCurrent((v) => !v)}
@@ -935,6 +1050,8 @@ function SecurityTab() {
                 type={showNew ? "text" : "password"}
                 className={cn(inputCls, "pr-10")}
                 placeholder="••••••••"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
               />
               <button
                 onClick={() => setShowNew((v) => !v)}
@@ -950,6 +1067,8 @@ function SecurityTab() {
                 type={showConfirm ? "text" : "password"}
                 className={cn(inputCls, "pr-10")}
                 placeholder="••••••••"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
               />
               <button
                 onClick={() => setShowConfirm((v) => !v)}
@@ -962,7 +1081,7 @@ function SecurityTab() {
         </div>
         <div className="mt-4">
           <button
-            onClick={() => { setSaved(true); setTimeout(() => setSaved(false), 2500); }}
+            onClick={handleUpdatePassword}
             className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition"
           >
             Update Password
@@ -1014,12 +1133,15 @@ function SecurityTab() {
       <div>
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-slate-800">Active Sessions</h3>
-          <button className="text-xs font-medium text-red-600 hover:underline">
+          <button
+            onClick={handleRevokeAllOther}
+            className="text-xs font-medium text-red-600 hover:underline"
+          >
             Revoke All Other Sessions
           </button>
         </div>
         <div className="space-y-3">
-          {sessions.map((s) => (
+          {activeSessions.map((s) => (
             <div
               key={s.id}
               className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white px-4 py-3"
@@ -1041,7 +1163,10 @@ function SecurityTab() {
                 </div>
               </div>
               {!s.current && (
-                <button className="shrink-0 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition">
+                <button
+                  onClick={() => handleRevokeSession(s.id)}
+                  className="shrink-0 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition"
+                >
                   Revoke
                 </button>
               )}

@@ -379,6 +379,7 @@ function getInitials(name: string): string {
 // ---------------------------------------------------------------------------
 
 export default function DocumentsPage() {
+  const [documents, setDocuments] = useState<Document[]>(mockDocuments);
   const [activeCategory, setActiveCategory] = useState<DocumentCategory>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -395,7 +396,7 @@ export default function DocumentsPage() {
 
   // Filtered documents
   const filteredDocuments = useMemo(() => {
-    return mockDocuments.filter((doc) => {
+    return documents.filter((doc) => {
       const matchesCategory =
         activeCategory === "ALL" || doc.category === activeCategory;
 
@@ -409,13 +410,13 @@ export default function DocumentsPage() {
 
       return matchesCategory && matchesSearch;
     });
-  }, [activeCategory, searchQuery]);
+  }, [documents, activeCategory, searchQuery]);
 
   // KPI calculations
-  const totalDocuments = mockDocuments.length;
-  const totalContracts = mockDocuments.filter((d) => d.category === "CONTRACT").length;
-  const totalCertificates = mockDocuments.filter((d) => d.category === "CERTIFICATE").length;
-  const expiringSoon = mockDocuments.filter((d) => isExpiringSoon(d.expiryDate)).length;
+  const totalDocuments = documents.length;
+  const totalContracts = documents.filter((d) => d.category === "CONTRACT").length;
+  const totalCertificates = documents.filter((d) => d.category === "CERTIFICATE").length;
+  const expiringSoon = documents.filter((d) => isExpiringSoon(d.expiryDate)).length;
 
   const stats = [
     {
@@ -453,6 +454,24 @@ export default function DocumentsPage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    const fileExt = selectedFileName.split(".").pop()?.toUpperCase() || "PDF";
+    const newDoc: Document = {
+      id: `doc-${Date.now()}`,
+      name: formData.name,
+      description: formData.description,
+      category: formData.category,
+      fileType: (["PDF", "DOC", "DOCX", "XLS", "XLSX", "PNG", "JPG", "CSV"].includes(fileExt) ? fileExt : "PDF") as FileType,
+      fileSize: selectedFileName ? "N/A" : "N/A",
+      uploadedBy: "Current User",
+      uploadDate: new Date().toISOString().split("T")[0],
+      expiryDate: formData.expiryDate || null,
+      accessLevel: formData.accessLevel,
+      customer: formData.customer || null,
+    };
+
+    setDocuments((prev) => [newDoc, ...prev]);
+    toast.success("Document uploaded successfully");
     setShowUploadModal(false);
     setFormData({
       name: "",
@@ -548,8 +567,8 @@ export default function DocumentsPage() {
               {CATEGORIES.map((cat) => {
                 const count =
                   cat.value === "ALL"
-                    ? mockDocuments.length
-                    : mockDocuments.filter((d) => d.category === cat.value).length;
+                    ? documents.length
+                    : documents.filter((d) => d.category === cat.value).length;
                 return (
                   <button
                     key={cat.value}
@@ -761,7 +780,10 @@ export default function DocumentsPage() {
                           </button>
                           <button
                             title="Delete"
-                            onClick={() => toast.error(`${doc.name} deleted`)}
+                            onClick={() => {
+                              setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
+                              toast.success(`${doc.name} deleted`);
+                            }}
                             className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-red-600"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -783,7 +805,7 @@ export default function DocumentsPage() {
                 </span>{" "}
                 of{" "}
                 <span className="font-medium text-gray-700">
-                  {mockDocuments.length}
+                  {documents.length}
                 </span>{" "}
                 documents
               </p>

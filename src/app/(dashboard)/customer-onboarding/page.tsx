@@ -24,6 +24,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { cn, getStatusColor, formatDate } from "@/lib/utils";
+import { toast } from "sonner";
 
 type WorkflowStage =
   | "INQUIRY"
@@ -66,7 +67,7 @@ const stages: { key: WorkflowStage; label: string; icon: typeof UserCheck }[] = 
 const stageIndex = (stage: WorkflowStage) =>
   stages.findIndex((s) => s.key === stage);
 
-const mockWorkflows: OnboardingWorkflow[] = [
+const initialWorkflows: OnboardingWorkflow[] = [
   {
     id: "ONB-001",
     customerName: "Namibia Breweries Ltd",
@@ -218,6 +219,7 @@ function formatStatusLabel(status: OnboardingStatus): string {
 }
 
 export default function CustomerOnboardingPage() {
+  const [workflows, setWorkflows] = useState<OnboardingWorkflow[]>(initialWorkflows);
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedWorkflow, setSelectedWorkflow] = useState<OnboardingWorkflow | null>(null);
@@ -234,7 +236,7 @@ export default function CustomerOnboardingPage() {
   });
 
   const filteredWorkflows = useMemo(() => {
-    return mockWorkflows.filter((wf) => {
+    return workflows.filter((wf) => {
       const filterMap: Record<string, string> = {
         "All": "All",
         "In Progress": "IN_PROGRESS",
@@ -255,7 +257,7 @@ export default function CustomerOnboardingPage() {
 
       return matchesStatus && matchesSearch;
     });
-  }, [statusFilter, searchQuery]);
+  }, [workflows, statusFilter, searchQuery]);
 
   const handleFormChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -265,6 +267,24 @@ export default function CustomerOnboardingPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const newWorkflow: OnboardingWorkflow = {
+      id: `ONB-${String(workflows.length + 1).padStart(3, "0")}`,
+      customerName: formData.customerName,
+      company: formData.company,
+      email: formData.email,
+      phone: formData.phone,
+      vehicleCount: Number(formData.vehicleCount),
+      currentStage: "INQUIRY",
+      status: "IN_PROGRESS",
+      assignedTo: formData.assignedTo,
+      startDate: new Date().toISOString().split("T")[0],
+      targetGoLive: formData.targetGoLive || new Date().toISOString().split("T")[0],
+      completedDate: null,
+      notes: formData.notes,
+      stagesCompleted: [],
+    };
+    setWorkflows((prev) => [...prev, newWorkflow]);
+    toast.success("Onboarding started");
     setShowNewModal(false);
     setFormData({
       customerName: "",
@@ -281,25 +301,25 @@ export default function CustomerOnboardingPage() {
   const stats = [
     {
       label: "Active Onboardings",
-      value: mockWorkflows.filter((w) => w.status === "IN_PROGRESS").length.toString(),
+      value: workflows.filter((w) => w.status === "IN_PROGRESS").length.toString(),
       icon: Clock,
       color: "text-blue-600 bg-blue-50",
     },
     {
       label: "Completed",
-      value: mockWorkflows.filter((w) => w.status === "COMPLETED").length.toString(),
+      value: workflows.filter((w) => w.status === "COMPLETED").length.toString(),
       icon: CheckCircle2,
       color: "text-green-600 bg-green-50",
     },
     {
       label: "On Hold",
-      value: mockWorkflows.filter((w) => w.status === "ON_HOLD").length.toString(),
+      value: workflows.filter((w) => w.status === "ON_HOLD").length.toString(),
       icon: AlertCircle,
       color: "text-yellow-600 bg-yellow-50",
     },
     {
       label: "Vehicles Pending",
-      value: mockWorkflows
+      value: workflows
         .filter((w) => w.status === "IN_PROGRESS")
         .reduce((sum, w) => sum + w.vehicleCount, 0)
         .toString(),
@@ -360,7 +380,7 @@ export default function CustomerOnboardingPage() {
         </h2>
         <div className="grid grid-cols-7 gap-2">
           {stages.map((stage) => {
-            const count = mockWorkflows.filter(
+            const count = workflows.filter(
               (w) => w.currentStage === stage.key && w.status !== "COMPLETED" && w.status !== "CANCELLED"
             ).length;
             const StageIcon = stage.icon;

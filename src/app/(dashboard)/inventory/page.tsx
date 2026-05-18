@@ -373,6 +373,9 @@ function getCategoryBadgeColor(category: string): string {
 // ---------------------------------------------------------------------------
 
 export default function InventoryPage() {
+  // Asset data
+  const [assets, setAssets] = useState<Asset[]>(mockAssets);
+
   // Filters
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
   const [statusFilter, setStatusFilter] = useState<string>("All");
@@ -398,7 +401,7 @@ export default function InventoryPage() {
   // ---- Computed values ----
 
   const filteredAssets = useMemo(() => {
-    return mockAssets.filter((asset) => {
+    return assets.filter((asset) => {
       if (categoryFilter !== "ALL" && asset.category !== categoryFilter)
         return false;
       if (statusFilter !== "All" && asset.status !== statusFilter) return false;
@@ -417,22 +420,22 @@ export default function InventoryPage() {
       }
       return true;
     });
-  }, [categoryFilter, statusFilter, searchQuery]);
+  }, [assets, categoryFilter, statusFilter, searchQuery]);
 
   const lowStockAssets = useMemo(() => {
-    return mockAssets.filter(
+    return assets.filter(
       (asset) =>
         asset.quantity <= asset.minStockLevel &&
         asset.status !== "RETIRED" &&
         asset.status !== "LOST"
     );
-  }, []);
+  }, [assets]);
 
-  const totalAssets = mockAssets.length;
-  const inStockCount = mockAssets.filter(
+  const totalAssets = assets.length;
+  const inStockCount = assets.filter(
     (a) => a.status === "AVAILABLE"
   ).length;
-  const assignedInUseCount = mockAssets.filter(
+  const assignedInUseCount = assets.filter(
     (a) => a.status === "ASSIGNED" || a.status === "IN_USE"
   ).length;
   const lowStockCount = lowStockAssets.length;
@@ -449,7 +452,29 @@ export default function InventoryPage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // In a real app this would POST to the API
+
+    const newAsset: Asset = {
+      id: String(Date.now()),
+      name: formData.name,
+      assetNumber:
+        formData.assetNumber ||
+        `AST-${String(assets.length + 1).padStart(4, "0")}`,
+      serialNumber: formData.serialNumber,
+      category: formData.category,
+      status: formData.status,
+      quantity: Number(formData.quantity) || 0,
+      minStockLevel: Number(formData.minStockLevel) || 0,
+      location: formData.location,
+      purchasePrice: Number(formData.purchasePrice) || 0,
+      currentValue: Number(formData.purchasePrice) || 0,
+      purchaseDate: new Date().toISOString().split("T")[0],
+      assignedTo: null,
+      notes: formData.notes,
+    };
+
+    setAssets((prev) => [...prev, newAsset]);
+    toast.success("Asset added successfully");
+
     setShowModal(false);
     setFormData({
       name: "",
@@ -798,7 +823,7 @@ export default function InventoryPage() {
               </span>{" "}
               of{" "}
               <span className="font-medium text-gray-700">
-                {mockAssets.length}
+                {assets.length}
               </span>{" "}
               assets
             </p>

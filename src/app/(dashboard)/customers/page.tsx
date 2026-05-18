@@ -16,10 +16,24 @@ import {
   X,
   Building2,
   ClipboardList,
+  ChevronRight,
 } from "lucide-react";
 import { cn, getStatusColor, formatDate } from "@/lib/utils";
 
-const mockCustomers = [
+interface Customer {
+  id: string;
+  name: string;
+  company: string;
+  email: string;
+  phone: string;
+  status: string;
+  vehicles: number;
+  city: string;
+  contractStart: string | null;
+  contractEnd: string | null;
+}
+
+const initialCustomers: Customer[] = [
   {
     id: "1",
     name: "Namibia Breweries Ltd",
@@ -133,6 +147,8 @@ const mockCustomers = [
 const statusFilters = ["All", "Prospect", "Active", "Inactive", "Churned"] as const;
 
 export default function CustomersPage() {
+  const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [showNewModal, setShowNewModal] = useState(false);
@@ -148,7 +164,7 @@ export default function CustomersPage() {
   });
 
   const filteredCustomers = useMemo(() => {
-    return mockCustomers.filter((customer) => {
+    return customers.filter((customer) => {
       const matchesStatus =
         statusFilter === "All" ||
         customer.status === statusFilter.toUpperCase();
@@ -163,7 +179,7 @@ export default function CustomersPage() {
 
       return matchesStatus && matchesSearch;
     });
-  }, [statusFilter, searchQuery]);
+  }, [customers, statusFilter, searchQuery]);
 
   const handleFormChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -173,6 +189,20 @@ export default function CustomersPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const newCustomer: Customer = {
+      id: `cust-${Date.now()}`,
+      name: formData.name,
+      company: formData.company || formData.name,
+      email: formData.email,
+      phone: formData.phone,
+      status: "ACTIVE",
+      vehicles: 0,
+      city: formData.city || "Unknown",
+      contractStart: null,
+      contractEnd: null,
+    };
+    setCustomers((prev) => [newCustomer, ...prev]);
+    toast.success("Customer created successfully");
     setShowNewModal(false);
     setFormData({
       name: "",
@@ -369,7 +399,7 @@ export default function CustomersPage() {
 
               {/* Action Buttons */}
               <div className="flex gap-2">
-                <button onClick={() => toast.info(`Viewing ${customer.name}`)} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50">
+                <button onClick={() => setSelectedCustomer(customer)} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50">
                   <Users className="h-4 w-4" />
                   View Details
                 </button>
@@ -383,10 +413,151 @@ export default function CustomersPage() {
         </div>
       )}
 
+      {/* Customer Detail Drawer */}
+      {selectedCustomer && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/50" onClick={() => setSelectedCustomer(null)}>
+          <div
+            className="h-full w-full max-w-md overflow-y-auto bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Drawer Header */}
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <h2 className="text-lg font-semibold text-gray-900">Customer Details</h2>
+              <button
+                onClick={() => setSelectedCustomer(null)}
+                className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Drawer Body */}
+            <div className="px-6 py-5 space-y-6">
+              {/* Name & Status */}
+              <div>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">{selectedCustomer.name}</h3>
+                    <div className="mt-1 flex items-center gap-1.5 text-sm text-gray-500">
+                      <Building2 className="h-4 w-4" />
+                      <span>{selectedCustomer.company}</span>
+                    </div>
+                  </div>
+                  <span
+                    className={cn(
+                      "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+                      getStatusColor(selectedCustomer.status)
+                    )}
+                  >
+                    {selectedCustomer.status}
+                  </span>
+                </div>
+              </div>
+
+              {/* Contact Section */}
+              <div>
+                <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Contact Information</h4>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 text-sm">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                      <Mail className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">Email</p>
+                      <p className="font-medium text-gray-900">{selectedCustomer.email}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-50 text-green-600">
+                      <Phone className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">Phone</p>
+                      <p className="font-medium text-gray-900">{selectedCustomer.phone}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 text-purple-600">
+                      <MapPin className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">City</p>
+                      <p className="font-medium text-gray-900">{selectedCustomer.city}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Fleet Section */}
+              <div>
+                <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Fleet Information</h4>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-gray-700 shadow-sm">
+                      <Car className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-gray-900">{selectedCustomer.vehicles}</p>
+                      <p className="text-xs text-gray-500">Tracked Vehicles</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contract Section */}
+              <div>
+                <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Contract Period</h4>
+                {selectedCustomer.contractStart && selectedCustomer.contractEnd ? (
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-gray-700 shadow-sm">
+                        <Calendar className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {formatDate(selectedCustomer.contractStart)} &ndash; {formatDate(selectedCustomer.contractEnd)}
+                        </p>
+                        <p className="text-xs text-gray-500">Active Contract</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm italic text-gray-400">No contract on file</p>
+                )}
+              </div>
+
+              {/* Customer ID */}
+              <div>
+                <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">System</h4>
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <span className="font-medium text-gray-400">ID:</span>
+                  <code className="rounded bg-gray-100 px-2 py-0.5 text-xs font-mono text-gray-600">{selectedCustomer.id}</code>
+                </div>
+              </div>
+            </div>
+
+            {/* Drawer Footer */}
+            <div className="border-t border-gray-200 px-6 py-4">
+              <button
+                onClick={() => {
+                  toast.info(`New job card for ${selectedCustomer.name} — coming soon`);
+                  setSelectedCustomer(null);
+                }}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+              >
+                <ClipboardList className="h-4 w-4" />
+                Add Job Card
+                <ChevronRight className="ml-auto h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* New Customer Modal */}
       {showNewModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg rounded-xl bg-white shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowNewModal(false)}>
+          <div className="w-full max-w-lg rounded-xl bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
               <h2 className="text-lg font-semibold text-gray-900">

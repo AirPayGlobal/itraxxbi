@@ -50,7 +50,7 @@ interface Task {
 // Mock Data
 // ---------------------------------------------------------------------------
 
-const mockTasks: Task[] = [
+const initialTasks: Task[] = [
   {
     id: "TSK-001",
     title: "Install GPS trackers on new Hilux fleet",
@@ -290,6 +290,9 @@ function getPriorityIcon(priority: string): string {
 // ---------------------------------------------------------------------------
 
 export default function TasksPage() {
+  // Task list state
+  const [tasks, setTasks] = useState<Task[]>(initialTasks);
+
   // View mode
   const [viewMode, setViewMode] = useState<"table" | "board">("table");
 
@@ -302,11 +305,14 @@ export default function TasksPage() {
   // Modal
   const [showModal, setShowModal] = useState(false);
 
+  // Track whether modal is editing an existing task
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+
   // Detail drawer
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
-  // Form state
-  const [formData, setFormData] = useState({
+  // Default form values
+  const defaultFormData = {
     title: "",
     description: "",
     status: "TODO",
@@ -314,11 +320,14 @@ export default function TasksPage() {
     assignee: "",
     dueDate: "",
     project: "Fleet Tracker Rollout",
-  });
+  };
+
+  // Form state
+  const [formData, setFormData] = useState(defaultFormData);
 
   // Filtering logic
   const filteredTasks = useMemo(() => {
-    return mockTasks.filter((task) => {
+    return tasks.filter((task) => {
       if (projectFilter !== "All Tasks" && task.project !== projectFilter)
         return false;
       if (statusFilter !== "All" && task.status !== statusFilter) return false;
@@ -339,20 +348,20 @@ export default function TasksPage() {
       }
       return true;
     });
-  }, [projectFilter, statusFilter, priorityFilter, searchQuery]);
+  }, [tasks, projectFilter, statusFilter, priorityFilter, searchQuery]);
 
   // KPI calculations
   const kpiStats = useMemo(() => {
-    const total = mockTasks.length;
-    const inProgress = mockTasks.filter(
+    const total = tasks.length;
+    const inProgress = tasks.filter(
       (t) => t.status === "IN_PROGRESS"
     ).length;
-    const completed = mockTasks.filter((t) => t.status === "DONE").length;
-    const overdue = mockTasks.filter((t) =>
+    const completed = tasks.filter((t) => t.status === "DONE").length;
+    const overdue = tasks.filter((t) =>
       isOverdue(t.dueDate, t.status)
     ).length;
     return { total, inProgress, completed, overdue };
-  }, []);
+  }, [tasks]);
 
   // Handlers
   function handleFormChange(
@@ -365,16 +374,48 @@ export default function TasksPage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (editingTask) {
+      // Update existing task
+      const updatedTask: Task = {
+        ...editingTask,
+        title: formData.title,
+        description: formData.description,
+        status: formData.status as Task["status"],
+        priority: formData.priority as Task["priority"],
+        assignee: formData.assignee,
+        dueDate: formData.dueDate,
+        project: formData.project,
+      };
+      setTasks((prev) =>
+        prev.map((t) => (t.id === editingTask.id ? updatedTask : t))
+      );
+      // Update selectedTask if the drawer is showing this task
+      if (selectedTask?.id === editingTask.id) {
+        setSelectedTask(updatedTask);
+      }
+      toast.success(`Task ${editingTask.id} updated successfully`);
+    } else {
+      // Create new task
+      const newId = `TSK-${String(tasks.length + 1).padStart(3, "0")}`;
+      const newTask: Task = {
+        id: newId,
+        title: formData.title,
+        description: formData.description,
+        status: formData.status as Task["status"],
+        priority: formData.priority as Task["priority"],
+        assignee: formData.assignee,
+        dueDate: formData.dueDate,
+        project: formData.project,
+        createdAt: new Date().toISOString(),
+      };
+      setTasks((prev) => [newTask, ...prev]);
+      toast.success(`Task ${newId} created successfully`);
+    }
+
     setShowModal(false);
-    setFormData({
-      title: "",
-      description: "",
-      status: "TODO",
-      priority: "MEDIUM",
-      assignee: "",
-      dueDate: "",
-      project: "Fleet Tracker Rollout",
-    });
+    setEditingTask(null);
+    setFormData(defaultFormData);
   }
 
   // -----------------------------------------------------------------------
@@ -395,7 +436,11 @@ export default function TasksPage() {
             </p>
           </div>
           <button
-            onClick={() => setShowModal(true)}
+            onClick={() => {
+              setEditingTask(null);
+              setFormData(defaultFormData);
+              setShowModal(true);
+            }}
             className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
           >
             <Plus className="h-4 w-4" />
@@ -738,7 +783,7 @@ export default function TasksPage() {
                             </button>
                             <button
                               title="Edit"
-                              onClick={() => { setSelectedTask(task); toast.info(`Editing ${task.id}`); }}
+                              onClick={() => setSelectedTask(task)}
                               className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-amber-600"
                             >
                               <Pencil className="h-4 w-4" />
@@ -761,7 +806,7 @@ export default function TasksPage() {
                 </span>{" "}
                 of{" "}
                 <span className="font-medium text-gray-700">
-                  {mockTasks.length}
+                  {tasks.length}
                 </span>{" "}
                 tasks
               </p>
@@ -1021,7 +1066,21 @@ export default function TasksPage() {
                 Close
               </button>
               <button
-                onClick={() => toast.info(`Edit mode for ${selectedTask?.id} — coming soon`)}
+                onClick={() => {
+                  if (selectedTask) {
+                    setEditingTask(selectedTask);
+                    setFormData({
+                      title: selectedTask.title,
+                      description: selectedTask.description,
+                      status: selectedTask.status,
+                      priority: selectedTask.priority,
+                      assignee: selectedTask.assignee,
+                      dueDate: selectedTask.dueDate,
+                      project: selectedTask.project,
+                    });
+                    setShowModal(true);
+                  }
+                }}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
               >
                 <Pencil className="h-3.5 w-3.5" />
@@ -1038,7 +1097,7 @@ export default function TasksPage() {
           {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => setShowModal(false)}
+            onClick={() => { setShowModal(false); setEditingTask(null); setFormData(defaultFormData); }}
           />
 
           {/* Modal content */}
@@ -1046,13 +1105,17 @@ export default function TasksPage() {
             {/* Header */}
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
               <div>
-                <h2 className="text-lg font-bold text-gray-900">New Task</h2>
+                <h2 className="text-lg font-bold text-gray-900">
+                  {editingTask ? "Edit Task" : "New Task"}
+                </h2>
                 <p className="text-sm text-gray-500">
-                  Fill in the details to create a new task.
+                  {editingTask
+                    ? `Editing ${editingTask.id} — update the details below.`
+                    : "Fill in the details to create a new task."}
                 </p>
               </div>
               <button
-                onClick={() => setShowModal(false)}
+                onClick={() => { setShowModal(false); setEditingTask(null); setFormData(defaultFormData); }}
                 className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
               >
                 <X className="h-5 w-5" />
@@ -1205,7 +1268,7 @@ export default function TasksPage() {
               <div className="mt-6 flex items-center justify-end gap-3 border-t border-gray-200 pt-5">
                 <button
                   type="button"
-                  onClick={() => setShowModal(false)}
+                  onClick={() => { setShowModal(false); setEditingTask(null); setFormData(defaultFormData); }}
                   className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                 >
                   Cancel
@@ -1214,7 +1277,7 @@ export default function TasksPage() {
                   type="submit"
                   className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                 >
-                  Create Task
+                  {editingTask ? "Save Changes" : "Create Task"}
                 </button>
               </div>
             </form>

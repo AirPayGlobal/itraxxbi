@@ -44,7 +44,7 @@ interface JobCard {
 // Mock Data
 // ---------------------------------------------------------------------------
 
-const mockJobCards: JobCard[] = [
+const INITIAL_JOB_CARDS: JobCard[] = [
   {
     id: "1",
     jobNumber: "JC-2602-0001",
@@ -219,6 +219,12 @@ function getJobTypeBadgeColor(type: string): string {
 // ---------------------------------------------------------------------------
 
 export default function JobCardsPage() {
+  // Job cards state
+  const [jobCards, setJobCards] = useState<JobCard[]>(INITIAL_JOB_CARDS);
+
+  // Selected job for detail drawer
+  const [selectedJob, setSelectedJob] = useState<JobCard | null>(null);
+
   // Filters
   const [statusFilter, setStatusFilter] = useState("All");
   const [jobTypeFilter, setJobTypeFilter] = useState("All");
@@ -244,7 +250,7 @@ export default function JobCardsPage() {
 
   // Filtering logic
   const filteredJobCards = useMemo(() => {
-    return mockJobCards.filter((job) => {
+    return jobCards.filter((job) => {
       if (statusFilter !== "All" && job.status !== statusFilter) return false;
       if (jobTypeFilter !== "All" && job.jobType !== jobTypeFilter) return false;
       if (priorityFilter !== "All" && job.priority !== priorityFilter)
@@ -263,7 +269,7 @@ export default function JobCardsPage() {
       }
       return true;
     });
-  }, [statusFilter, jobTypeFilter, priorityFilter, searchQuery]);
+  }, [jobCards, statusFilter, jobTypeFilter, priorityFilter, searchQuery]);
 
   // Handlers
   function handleFormChange(
@@ -276,7 +282,28 @@ export default function JobCardsPage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // In a real app this would POST to the API
+
+    // Generate a sequential job number based on existing cards
+    const nextNum = jobCards.length + 1;
+    const jobNumber = `JC-2602-${String(nextNum).padStart(4, "0")}`;
+
+    const newJobCard: JobCard = {
+      id: String(Date.now()),
+      jobNumber,
+      title: formData.title,
+      customer: formData.customer,
+      technician: formData.technician,
+      jobType: formData.jobType,
+      status: "OPEN",
+      priority: formData.priority,
+      scheduledDate: formData.scheduledDate,
+      estimatedHours: formData.estimatedHours
+        ? Number(formData.estimatedHours)
+        : 0,
+    };
+
+    setJobCards((prev) => [newJobCard, ...prev]);
+    toast.success(`Job card ${jobNumber} created`);
     setShowModal(false);
     setFormData({
       title: "",
@@ -521,7 +548,10 @@ export default function JobCardsPage() {
                     >
                       {/* Job Number */}
                       <td className="whitespace-nowrap px-4 py-3">
-                        <span className="cursor-pointer font-bold text-blue-600 hover:text-blue-800 hover:underline">
+                        <span
+                          className="cursor-pointer font-bold text-blue-600 hover:text-blue-800 hover:underline"
+                          onClick={() => setSelectedJob(job)}
+                        >
                           {job.jobNumber}
                         </span>
                       </td>
@@ -594,7 +624,7 @@ export default function JobCardsPage() {
                         <div className="flex items-center justify-center gap-1">
                           <button
                             title="View"
-                            onClick={() => toast.info(`Viewing ${job.jobNumber} — ${job.title}`)}
+                            onClick={() => setSelectedJob(job)}
                             className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-blue-600"
                           >
                             <Eye className="h-4 w-4" />
@@ -624,13 +654,120 @@ export default function JobCardsPage() {
               </span>{" "}
               of{" "}
               <span className="font-medium text-gray-700">
-                {mockJobCards.length}
+                {jobCards.length}
               </span>{" "}
               job cards
             </p>
           </div>
         </div>
       </div>
+
+      {/* ---- Detail Drawer ---- */}
+      {selectedJob && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setSelectedJob(null)}
+          />
+
+          {/* Drawer panel */}
+          <div className="relative w-full max-w-md overflow-y-auto bg-white shadow-2xl">
+            {/* Header */}
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">
+                  {selectedJob.jobNumber}
+                </h2>
+                <p className="text-sm text-gray-500">{selectedJob.title}</p>
+              </div>
+              <button
+                onClick={() => setSelectedJob(null)}
+                className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Details */}
+            <div className="space-y-5 px-6 py-5">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Status</p>
+                  <span
+                    className={cn(
+                      "mt-1 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+                      getStatusColor(selectedJob.status)
+                    )}
+                  >
+                    {formatLabel(selectedJob.status)}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Priority</p>
+                  <span
+                    className={cn(
+                      "mt-1 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+                      getPriorityColor(selectedJob.priority)
+                    )}
+                  >
+                    {formatLabel(selectedJob.priority)}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Job Type</p>
+                  <span
+                    className={cn(
+                      "mt-1 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+                      getJobTypeBadgeColor(selectedJob.jobType)
+                    )}
+                  >
+                    {formatLabel(selectedJob.jobType)}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-500">
+                    Scheduled Date
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-gray-800">
+                    {formatDate(selectedJob.scheduledDate)}
+                  </p>
+                </div>
+              </div>
+
+              <hr className="border-gray-200" />
+
+              <div>
+                <p className="text-xs font-medium text-gray-500">Customer</p>
+                <p className="mt-1 text-sm font-medium text-gray-800">
+                  {selectedJob.customer}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs font-medium text-gray-500">Technician</p>
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">
+                    {getInitials(selectedJob.technician)}
+                  </span>
+                  <span className="text-sm font-medium text-gray-800">
+                    {selectedJob.technician}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-medium text-gray-500">
+                  Estimated Hours
+                </p>
+                <p className="mt-1 text-sm font-medium text-gray-800">
+                  {selectedJob.estimatedHours}h
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ---- New Job Card Modal ---- */}
       {showModal && (
