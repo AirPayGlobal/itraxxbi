@@ -152,8 +152,10 @@ export function Header({ onOpenCommand }: HeaderProps) {
               <div className="my-1 border-t border-slate-100" />
               <button
                 className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 transition-colors hover:bg-red-50"
-                onClick={() => {
-                  signOut({ callbackUrl: "/login" });
+                onClick={async () => {
+                  setShowUserMenu(false);
+                  const result = await signOut({ redirect: false, callbackUrl: "/login" });
+                  window.location.href = result?.url ?? "/login";
                 }}
               >
                 <LogOut className="h-4 w-4" />
