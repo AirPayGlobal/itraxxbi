@@ -3,8 +3,10 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { canAccessRoute } from "@/lib/role-access";
 import {
   Home,
   CheckSquare,
@@ -58,6 +60,7 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle, onOpenCommand }: SidebarProps) {
   const pathname = usePathname();
+  const { data: session } = useSession();
   const [customLogo, setCustomLogo] = useState<string | null>(null);
 
   useEffect(() => {
@@ -118,7 +121,7 @@ export function Sidebar({ collapsed, onToggle, onOpenCommand }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-2">
-        {navigationItems.map((item) => {
+        {navigationItems.filter((item) => session?.user?.role ? canAccessRoute(session.user.role, item.href) : true).map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);
 

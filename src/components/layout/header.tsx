@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
+import { useSession, signOut } from "next-auth/react";
+import { cn, getInitials } from "@/lib/utils";
 import {
   Search,
   Bell,
@@ -53,6 +54,7 @@ interface HeaderProps {
 
 export function Header({ onOpenCommand }: HeaderProps) {
   const pathname = usePathname();
+  const { data: session } = useSession();
   const [searchQuery, setSearchQuery] = useState("");
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -116,11 +118,11 @@ export function Header({ onOpenCommand }: HeaderProps) {
             className="flex items-center gap-2 rounded-lg p-1.5 transition-colors hover:bg-slate-100"
           >
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white">
-              AD
+              {getInitials(session?.user?.name || "?")}
             </div>
             <div className="hidden text-left md:block">
-              <p className="text-sm font-medium text-slate-700">Admin User</p>
-              <p className="text-xs text-slate-500">admin@itrackerx.com</p>
+              <p className="text-sm font-medium text-slate-700">{session?.user?.name || "User"}</p>
+              <p className="text-xs text-slate-500">{session?.user?.email || ""}</p>
             </div>
             <ChevronDown
               className={cn(
@@ -151,8 +153,7 @@ export function Header({ onOpenCommand }: HeaderProps) {
               <button
                 className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 transition-colors hover:bg-red-50"
                 onClick={() => {
-                  // Logout handler placeholder
-                  setShowUserMenu(false);
+                  signOut({ callbackUrl: "/login" });
                 }}
               >
                 <LogOut className="h-4 w-4" />

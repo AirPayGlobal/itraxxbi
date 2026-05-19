@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Toaster } from "sonner";
+import AuthSessionProvider from "@/components/providers/session-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,6 +17,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="font-sans antialiased">
+        <AuthSessionProvider>
         {children}
         <Toaster
           position="top-right"
@@ -33,6 +35,7 @@ export default function RootLayout({
           }}
           richColors
         />
+        </AuthSessionProvider>
       </body>
     </html>
   );
