@@ -1,15 +1,15 @@
 "use client";
 
-import { useState, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
 import { AuthLayout } from "@/components/auth/auth-layout";
+import { createClient } from "@/lib/supabase/client";
 
 function ResetPasswordForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const token = searchParams.get("token");
+  const supabase = createClient();
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -17,6 +17,22 @@ function ResetPasswordForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [hasRecoverySession, setHasRecoverySession] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      setHasRecoverySession(!!data.session);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY" || session) setHasRecoverySession(true);
+    });
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
+  }, [supabase]);
 
   const passwordChecks = [
     { label: "At least 8 characters", valid: password.length >= 8 },
@@ -26,7 +42,7 @@ function ResetPasswordForm() {
 
   const passwordsMatch = password.length > 0 && password === confirmPassword;
 
-  if (!token) {
+  if (hasRecoverySession === false) {
     return (
       <AuthLayout title="Invalid link" subtitle="This reset link appears to be broken">
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-center">
@@ -67,27 +83,17 @@ function ResetPasswordForm() {
 
     setLoading(true);
 
-    try {
-      const res = await fetch("/api/auth/reset-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, password }),
-      });
+    const { error: updateError } = await supabase.auth.updateUser({ password });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error || "Failed to reset password");
-        setLoading(false);
-        return;
-      }
-
-      setSuccess(true);
-      setTimeout(() => router.push("/login"), 3000);
-    } catch {
-      setError("Something went wrong. Please try again.");
+    if (updateError) {
+      setError(updateError.message || "Failed to reset password");
       setLoading(false);
+      return;
     }
+
+    await supabase.auth.signOut();
+    setSuccess(true);
+    setTimeout(() => router.push("/login"), 3000);
   }
 
   if (success) {

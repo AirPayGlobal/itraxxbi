@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff, Loader2, CheckCircle2 } from "lucide-react";
 import { AuthLayout } from "@/components/auth/auth-layout";
+import { createClient } from "@/lib/supabase/client";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -51,33 +52,28 @@ export default function RegisterPage() {
 
     setLoading(true);
 
-    try {
-      const res = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+    const supabase = createClient();
+    const { error: signUpError } = await supabase.auth.signUp({
+      email: formData.email,
+      password: formData.password,
+      options: {
+        data: {
           name: formData.name,
-          email: formData.email,
-          password: formData.password,
-          department: formData.department || undefined,
-          phone: formData.phone || undefined,
-        }),
-      });
+          role: "STAFF",
+          department: formData.department || null,
+          phone: formData.phone || null,
+        },
+      },
+    });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error || "Registration failed");
-        setLoading(false);
-        return;
-      }
-
-      setSuccess(true);
-      setTimeout(() => router.push("/login"), 2000);
-    } catch {
-      setError("Something went wrong. Please try again.");
+    if (signUpError) {
+      setError(signUpError.message || "Registration failed");
       setLoading(false);
+      return;
     }
+
+    setSuccess(true);
+    setTimeout(() => router.push("/login"), 2000);
   }
 
   if (success) {
