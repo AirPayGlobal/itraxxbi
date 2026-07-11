@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { toast } from "sonner";
 import {
   Users,
   FileText,
-  Car,
-  DollarSign,
+  UserCheck,
+  UserPlus,
   Plus,
   Search,
   Mail,
@@ -15,153 +14,47 @@ import {
   Calendar,
   X,
   Building2,
-  ClipboardList,
-  ChevronRight,
+  Pencil,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 import { cn, getStatusColor, formatDate } from "@/lib/utils";
-
-interface Customer {
-  id: string;
-  name: string;
-  company: string;
-  email: string;
-  phone: string;
-  status: string;
-  vehicles: number;
-  city: string;
-  contractStart: string | null;
-  contractEnd: string | null;
-}
-
-const initialCustomers: Customer[] = [
-  {
-    id: "1",
-    name: "Namibia Breweries Ltd",
-    company: "NBL Group",
-    email: "fleet@nbl.com.na",
-    phone: "+264 61 320 4999",
-    status: "ACTIVE",
-    vehicles: 18,
-    city: "Windhoek",
-    contractStart: "2025-01-15",
-    contractEnd: "2026-01-15",
-  },
-  {
-    id: "2",
-    name: "TransNamib Holdings",
-    company: "TransNamib",
-    email: "ops@transnamib.com.na",
-    phone: "+264 61 298 2032",
-    status: "ACTIVE",
-    vehicles: 45,
-    city: "Windhoek",
-    contractStart: "2025-03-01",
-    contractEnd: "2026-03-01",
-  },
-  {
-    id: "3",
-    name: "Pupkewitz Motors",
-    company: "Pupkewitz Group",
-    email: "fleet@pupkewitz.com",
-    phone: "+264 61 224 081",
-    status: "ACTIVE",
-    vehicles: 22,
-    city: "Windhoek",
-    contractStart: "2025-06-01",
-    contractEnd: "2026-06-01",
-  },
-  {
-    id: "4",
-    name: "Ohlthaver & List",
-    company: "O&L Group",
-    email: "transport@ol.na",
-    phone: "+264 61 207 5111",
-    status: "ACTIVE",
-    vehicles: 35,
-    city: "Windhoek",
-    contractStart: "2025-02-15",
-    contractEnd: "2026-02-15",
-  },
-  {
-    id: "5",
-    name: "Namibia Logistics",
-    company: "NamLog",
-    email: "info@namlog.com.na",
-    phone: "+264 61 215 774",
-    status: "PROSPECT",
-    vehicles: 0,
-    city: "Walvis Bay",
-    contractStart: null,
-    contractEnd: null,
-  },
-  {
-    id: "6",
-    name: "Meat Corp Namibia",
-    company: "MeatCo",
-    email: "logistics@meatco.com.na",
-    phone: "+264 61 321 200",
-    status: "ACTIVE",
-    vehicles: 28,
-    city: "Windhoek",
-    contractStart: "2025-04-01",
-    contractEnd: "2026-04-01",
-  },
-  {
-    id: "7",
-    name: "Bank Windhoek",
-    company: "Capricorn Group",
-    email: "fleet@bankwindhoek.com.na",
-    phone: "+264 61 299 1234",
-    status: "ACTIVE",
-    vehicles: 12,
-    city: "Windhoek",
-    contractStart: "2025-07-01",
-    contractEnd: "2026-07-01",
-  },
-  {
-    id: "8",
-    name: "Namdeb Diamond Corp",
-    company: "Namdeb",
-    email: "fleet@namdeb.com",
-    phone: "+264 63 233 300",
-    status: "INACTIVE",
-    vehicles: 8,
-    city: "Oranjemund",
-    contractStart: "2024-06-01",
-    contractEnd: "2025-06-01",
-  },
-  {
-    id: "9",
-    name: "FNB Namibia",
-    company: "FirstRand",
-    email: "ops@fnbnamibia.com.na",
-    phone: "+264 61 299 2222",
-    status: "PROSPECT",
-    vehicles: 0,
-    city: "Windhoek",
-    contractStart: null,
-    contractEnd: null,
-  },
-];
+import {
+  useCustomers,
+  useCreateCustomer,
+  useUpdateCustomer,
+  useDeleteCustomer,
+  type Customer,
+  type CustomerInput,
+} from "@/lib/hooks/use-customers";
+import type { CustomerStatus } from "@/lib/supabase/database.types";
 
 const statusFilters = ["All", "Prospect", "Active", "Inactive", "Churned"] as const;
 
+const emptyForm: CustomerInput = {
+  name: "",
+  company: "",
+  email: "",
+  phone: "",
+  address: "",
+  city: "",
+  country: "Namibia",
+  status: "ACTIVE",
+  notes: "",
+};
+
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
+  const { data: customers = [], isLoading, isError, error } = useCustomers();
+  const createCustomer = useCreateCustomer();
+  const updateCustomer = useUpdateCustomer();
+  const deleteCustomer = useDeleteCustomer();
+
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState("");
-  const [showNewModal, setShowNewModal] = useState(false);
-  const [formData, setFormData] = useState({
-    name: "",
-    company: "",
-    email: "",
-    phone: "",
-    address: "",
-    city: "",
-    country: "",
-    notes: "",
-  });
+  const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formData, setFormData] = useState<CustomerInput>(emptyForm);
 
   const filteredCustomers = useMemo(() => {
     return customers.filter((customer) => {
@@ -173,75 +66,119 @@ export default function CustomersPage() {
       const matchesSearch =
         query === "" ||
         customer.name.toLowerCase().includes(query) ||
-        customer.company.toLowerCase().includes(query) ||
-        customer.email.toLowerCase().includes(query) ||
-        customer.city.toLowerCase().includes(query);
+        (customer.company ?? "").toLowerCase().includes(query) ||
+        (customer.email ?? "").toLowerCase().includes(query) ||
+        (customer.city ?? "").toLowerCase().includes(query);
 
       return matchesStatus && matchesSearch;
     });
   }, [customers, statusFilter, searchQuery]);
 
+  const stats = useMemo(() => {
+    const active = customers.filter((c) => c.status === "ACTIVE").length;
+    const prospects = customers.filter((c) => c.status === "PROSPECT").length;
+    const withContract = customers.filter(
+      (c) => c.contract_start && c.contract_end
+    ).length;
+    return [
+      {
+        label: "Total Customers",
+        value: String(customers.length),
+        icon: Users,
+        color: "text-blue-600 bg-blue-50",
+      },
+      {
+        label: "Active",
+        value: String(active),
+        icon: UserCheck,
+        color: "text-green-600 bg-green-50",
+      },
+      {
+        label: "Active Contracts",
+        value: String(withContract),
+        icon: FileText,
+        color: "text-purple-600 bg-purple-50",
+      },
+      {
+        label: "Prospects",
+        value: String(prospects),
+        icon: UserPlus,
+        color: "text-amber-600 bg-amber-50",
+      },
+    ];
+  }, [customers]);
+
   const handleFormChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
   ) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const newCustomer: Customer = {
-      id: `cust-${Date.now()}`,
-      name: formData.name,
-      company: formData.company || formData.name,
-      email: formData.email,
-      phone: formData.phone,
-      status: "ACTIVE",
-      vehicles: 0,
-      city: formData.city || "Unknown",
-      contractStart: null,
-      contractEnd: null,
-    };
-    setCustomers((prev) => [newCustomer, ...prev]);
-    toast.success("Customer created successfully");
-    setShowNewModal(false);
-    setFormData({
-      name: "",
-      company: "",
-      email: "",
-      phone: "",
-      address: "",
-      city: "",
-      country: "",
-      notes: "",
-    });
-  };
+  function openCreate() {
+    setEditingId(null);
+    setFormData(emptyForm);
+    setShowModal(true);
+  }
 
-  const stats = [
-    {
-      label: "Total Customers",
-      value: "156",
-      icon: Users,
-      color: "text-blue-600 bg-blue-50",
-    },
-    {
-      label: "Active Contracts",
-      value: "128",
-      icon: FileText,
-      color: "text-green-600 bg-green-50",
-    },
-    {
-      label: "Vehicles Tracked",
-      value: "342",
-      icon: Car,
-      color: "text-purple-600 bg-purple-50",
-    },
-    {
-      label: "Monthly Recurring",
-      value: "$28,400",
-      icon: DollarSign,
-      color: "text-emerald-600 bg-emerald-50",
-    },
-  ];
+  function openEdit(customer: Customer) {
+    setEditingId(customer.id);
+    setFormData({
+      name: customer.name,
+      company: customer.company ?? "",
+      email: customer.email ?? "",
+      phone: customer.phone ?? "",
+      address: customer.address ?? "",
+      city: customer.city ?? "",
+      country: customer.country ?? "Namibia",
+      status: customer.status,
+      notes: customer.notes ?? "",
+    });
+    setSelectedCustomer(null);
+    setShowModal(true);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const payload: CustomerInput = {
+      ...formData,
+      company: formData.company || null,
+      email: formData.email || null,
+      phone: formData.phone || null,
+      address: formData.address || null,
+      city: formData.city || null,
+    };
+    try {
+      if (editingId) {
+        await updateCustomer.mutateAsync({ id: editingId, ...payload });
+      } else {
+        await createCustomer.mutateAsync(payload);
+      }
+      setShowModal(false);
+      setFormData(emptyForm);
+      setEditingId(null);
+    } catch {
+      // error toast handled in the hook
+    }
+  }
+
+  async function handleDelete(customer: Customer) {
+    if (
+      !window.confirm(
+        `Delete ${customer.name}? This cannot be undone.`
+      )
+    )
+      return;
+    try {
+      await deleteCustomer.mutateAsync(customer.id);
+      setSelectedCustomer(null);
+    } catch {
+      // handled in hook
+    }
+  }
+
+  const isSaving = createCustomer.isPending || updateCustomer.isPending;
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
@@ -256,7 +193,7 @@ export default function CustomersPage() {
           </p>
         </div>
         <button
-          onClick={() => setShowNewModal(true)}
+          onClick={openCreate}
           className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
         >
           <Plus className="h-4 w-4" />
@@ -277,7 +214,7 @@ export default function CustomersPage() {
                   {stat.label}
                 </p>
                 <p className="mt-1 text-2xl font-bold text-gray-900">
-                  {stat.value}
+                  {isLoading ? "—" : stat.value}
                 </p>
               </div>
               <div className={cn("rounded-lg p-3", stat.color)}>
@@ -318,15 +255,31 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      {/* Customer Cards Grid */}
-      {filteredCustomers.length === 0 ? (
+      {/* States */}
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center rounded-xl border border-gray-200 bg-white py-16 shadow-sm">
+          <Loader2 className="mb-3 h-8 w-8 animate-spin text-blue-500" />
+          <p className="text-sm text-gray-500">Loading customers…</p>
+        </div>
+      ) : isError ? (
+        <div className="flex flex-col items-center justify-center rounded-xl border border-red-200 bg-red-50 py-16 shadow-sm">
+          <p className="text-lg font-medium text-red-700">
+            Failed to load customers
+          </p>
+          <p className="mt-1 text-sm text-red-500">
+            {(error as Error)?.message ?? "Please try again."}
+          </p>
+        </div>
+      ) : filteredCustomers.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-gray-200 bg-white py-16 shadow-sm">
           <Users className="mb-3 h-12 w-12 text-gray-300" />
           <p className="text-lg font-medium text-gray-500">
             No customers found
           </p>
           <p className="mt-1 text-sm text-gray-400">
-            Try adjusting your filters or search query
+            {customers.length === 0
+              ? "Create your first customer to get started"
+              : "Try adjusting your filters or search query"}
           </p>
         </div>
       ) : (
@@ -344,7 +297,9 @@ export default function CustomersPage() {
                   </h3>
                   <div className="mt-0.5 flex items-center gap-1.5 text-sm text-gray-500">
                     <Building2 className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span className="truncate">{customer.company}</span>
+                    <span className="truncate">
+                      {customer.company ?? "—"}
+                    </span>
                   </div>
                 </div>
                 <span
@@ -361,51 +316,62 @@ export default function CustomersPage() {
               <div className="mb-4 space-y-2">
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <Mail className="h-4 w-4 flex-shrink-0 text-gray-400" />
-                  <span className="truncate">{customer.email}</span>
+                  <span className="truncate">{customer.email ?? "—"}</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <Phone className="h-4 w-4 flex-shrink-0 text-gray-400" />
-                  <span>{customer.phone}</span>
+                  <span>{customer.phone ?? "—"}</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <MapPin className="h-4 w-4 flex-shrink-0 text-gray-400" />
-                  <span>{customer.city}</span>
+                  <span>{customer.city ?? "—"}</span>
                 </div>
               </div>
 
-              {/* Vehicles & Contract */}
+              {/* Contract */}
               <div className="mb-4 flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2.5">
-                <div className="flex items-center gap-2 text-sm">
-                  <Car className="h-4 w-4 text-gray-500" />
-                  <span className="font-medium text-gray-700">
-                    {customer.vehicles}
-                  </span>
-                  <span className="text-gray-500">vehicles</span>
-                </div>
-                {customer.contractStart && customer.contractEnd ? (
-                  <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                {customer.contract_start && customer.contract_end ? (
+                  <div className="flex items-center gap-1.5 text-xs text-gray-600">
                     <Calendar className="h-3.5 w-3.5" />
                     <span>
-                      {formatDate(customer.contractStart)} &ndash;{" "}
-                      {formatDate(customer.contractEnd)}
+                      {formatDate(customer.contract_start)} &ndash;{" "}
+                      {formatDate(customer.contract_end)}
                     </span>
                   </div>
                 ) : (
                   <span className="text-xs italic text-gray-400">
-                    No contract
+                    No contract on file
                   </span>
+                )}
+                {customer.account_number && (
+                  <code className="rounded bg-white px-2 py-0.5 text-[11px] font-mono text-gray-500">
+                    {customer.account_number}
+                  </code>
                 )}
               </div>
 
               {/* Action Buttons */}
               <div className="flex gap-2">
-                <button onClick={() => setSelectedCustomer(customer)} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50">
+                <button
+                  onClick={() => setSelectedCustomer(customer)}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                >
                   <Users className="h-4 w-4" />
-                  View Details
+                  View
                 </button>
-                <button onClick={() => toast.info(`New job card for ${customer.name} — coming soon`)} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700">
-                  <ClipboardList className="h-4 w-4" />
-                  Add Job Card
+                <button
+                  onClick={() => openEdit(customer)}
+                  className="flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                  aria-label={`Edit ${customer.name}`}
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => handleDelete(customer)}
+                  className="flex items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+                  aria-label={`Delete ${customer.name}`}
+                >
+                  <Trash2 className="h-4 w-4" />
                 </button>
               </div>
             </div>
@@ -415,14 +381,19 @@ export default function CustomersPage() {
 
       {/* Customer Detail Drawer */}
       {selectedCustomer && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/50" onClick={() => setSelectedCustomer(null)}>
+        <div
+          className="fixed inset-0 z-50 flex justify-end bg-black/50"
+          onClick={() => setSelectedCustomer(null)}
+        >
           <div
             className="h-full w-full max-w-md overflow-y-auto bg-white shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Drawer Header */}
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-              <h2 className="text-lg font-semibold text-gray-900">Customer Details</h2>
+              <h2 className="text-lg font-semibold text-gray-900">
+                Customer Details
+              </h2>
               <button
                 onClick={() => setSelectedCustomer(null)}
                 className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
@@ -432,15 +403,16 @@ export default function CustomersPage() {
             </div>
 
             {/* Drawer Body */}
-            <div className="px-6 py-5 space-y-6">
-              {/* Name & Status */}
+            <div className="space-y-6 px-6 py-5">
               <div>
                 <div className="flex items-start justify-between">
                   <div>
-                    <h3 className="text-xl font-bold text-gray-900">{selectedCustomer.name}</h3>
+                    <h3 className="text-xl font-bold text-gray-900">
+                      {selectedCustomer.name}
+                    </h3>
                     <div className="mt-1 flex items-center gap-1.5 text-sm text-gray-500">
                       <Building2 className="h-4 w-4" />
-                      <span>{selectedCustomer.company}</span>
+                      <span>{selectedCustomer.company ?? "—"}</span>
                     </div>
                   </div>
                   <span
@@ -454,9 +426,10 @@ export default function CustomersPage() {
                 </div>
               </div>
 
-              {/* Contact Section */}
               <div>
-                <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Contact Information</h4>
+                <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">
+                  Contact Information
+                </h4>
                 <div className="space-y-3">
                   <div className="flex items-center gap-3 text-sm">
                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
@@ -464,7 +437,9 @@ export default function CustomersPage() {
                     </div>
                     <div>
                       <p className="text-xs text-gray-400">Email</p>
-                      <p className="font-medium text-gray-900">{selectedCustomer.email}</p>
+                      <p className="font-medium text-gray-900">
+                        {selectedCustomer.email ?? "—"}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 text-sm">
@@ -473,7 +448,9 @@ export default function CustomersPage() {
                     </div>
                     <div>
                       <p className="text-xs text-gray-400">Phone</p>
-                      <p className="font-medium text-gray-900">{selectedCustomer.phone}</p>
+                      <p className="font-medium text-gray-900">
+                        {selectedCustomer.phone ?? "—"}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 text-sm">
@@ -481,33 +458,34 @@ export default function CustomersPage() {
                       <MapPin className="h-4 w-4" />
                     </div>
                     <div>
-                      <p className="text-xs text-gray-400">City</p>
-                      <p className="font-medium text-gray-900">{selectedCustomer.city}</p>
+                      <p className="text-xs text-gray-400">Location</p>
+                      <p className="font-medium text-gray-900">
+                        {[selectedCustomer.city, selectedCustomer.country]
+                          .filter(Boolean)
+                          .join(", ") || "—"}
+                      </p>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Fleet Section */}
-              <div>
-                <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Fleet Information</h4>
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-gray-700 shadow-sm">
-                      <Car className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-gray-900">{selectedCustomer.vehicles}</p>
-                      <p className="text-xs text-gray-500">Tracked Vehicles</p>
-                    </div>
-                  </div>
+              {selectedCustomer.address && (
+                <div>
+                  <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">
+                    Address
+                  </h4>
+                  <p className="text-sm text-gray-700">
+                    {selectedCustomer.address}
+                  </p>
                 </div>
-              </div>
+              )}
 
-              {/* Contract Section */}
               <div>
-                <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Contract Period</h4>
-                {selectedCustomer.contractStart && selectedCustomer.contractEnd ? (
+                <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">
+                  Contract Period
+                </h4>
+                {selectedCustomer.contract_start &&
+                selectedCustomer.contract_end ? (
                   <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-gray-700 shadow-sm">
@@ -515,56 +493,70 @@ export default function CustomersPage() {
                       </div>
                       <div>
                         <p className="text-sm font-medium text-gray-900">
-                          {formatDate(selectedCustomer.contractStart)} &ndash; {formatDate(selectedCustomer.contractEnd)}
+                          {formatDate(selectedCustomer.contract_start)} &ndash;{" "}
+                          {formatDate(selectedCustomer.contract_end)}
                         </p>
                         <p className="text-xs text-gray-500">Active Contract</p>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm italic text-gray-400">No contract on file</p>
+                  <p className="text-sm italic text-gray-400">
+                    No contract on file
+                  </p>
                 )}
               </div>
 
-              {/* Customer ID */}
-              <div>
-                <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">System</h4>
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <span className="font-medium text-gray-400">ID:</span>
-                  <code className="rounded bg-gray-100 px-2 py-0.5 text-xs font-mono text-gray-600">{selectedCustomer.id}</code>
+              {selectedCustomer.notes && (
+                <div>
+                  <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">
+                    Notes
+                  </h4>
+                  <p className="whitespace-pre-wrap text-sm text-gray-700">
+                    {selectedCustomer.notes}
+                  </p>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Drawer Footer */}
-            <div className="border-t border-gray-200 px-6 py-4">
+            <div className="flex gap-3 border-t border-gray-200 px-6 py-4">
               <button
-                onClick={() => {
-                  toast.info(`New job card for ${selectedCustomer.name} — coming soon`);
-                  setSelectedCustomer(null);
-                }}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+                onClick={() => openEdit(selectedCustomer)}
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
               >
-                <ClipboardList className="h-4 w-4" />
-                Add Job Card
-                <ChevronRight className="ml-auto h-4 w-4" />
+                <Pencil className="h-4 w-4" />
+                Edit
+              </button>
+              <button
+                onClick={() => handleDelete(selectedCustomer)}
+                className="flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* New Customer Modal */}
-      {showNewModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowNewModal(false)}>
-          <div className="w-full max-w-lg rounded-xl bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
+      {/* New/Edit Customer Modal */}
+      {showModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setShowModal(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
               <h2 className="text-lg font-semibold text-gray-900">
-                New Customer
+                {editingId ? "Edit Customer" : "New Customer"}
               </h2>
               <button
-                onClick={() => setShowNewModal(false)}
+                onClick={() => setShowModal(false)}
                 className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
               >
                 <X className="h-5 w-5" />
@@ -574,7 +566,6 @@ export default function CustomersPage() {
             {/* Modal Form */}
             <form onSubmit={handleSubmit}>
               <div className="max-h-[65vh] space-y-4 overflow-y-auto px-6 py-4">
-                {/* Name */}
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">
                     Name <span className="text-red-500">*</span>
@@ -590,32 +581,55 @@ export default function CustomersPage() {
                   />
                 </div>
 
-                {/* Company */}
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Company
-                  </label>
-                  <input
-                    type="text"
-                    name="company"
-                    value={formData.company}
-                    onChange={handleFormChange}
-                    placeholder="Company or group name"
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
-                </div>
-
-                {/* Email & Phone Row */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Email <span className="text-red-500">*</span>
+                      Company
+                    </label>
+                    <input
+                      type="text"
+                      name="company"
+                      value={formData.company ?? ""}
+                      onChange={handleFormChange}
+                      placeholder="Company or group name"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                      Status
+                    </label>
+                    <select
+                      name="status"
+                      value={formData.status}
+                      onChange={handleFormChange}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      {(
+                        [
+                          "PROSPECT",
+                          "ACTIVE",
+                          "INACTIVE",
+                          "CHURNED",
+                        ] as CustomerStatus[]
+                      ).map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                      Email
                     </label>
                     <input
                       type="email"
                       name="email"
-                      required
-                      value={formData.email}
+                      value={formData.email ?? ""}
                       onChange={handleFormChange}
                       placeholder="email@company.com"
                       className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -628,7 +642,7 @@ export default function CustomersPage() {
                     <input
                       type="tel"
                       name="phone"
-                      value={formData.phone}
+                      value={formData.phone ?? ""}
                       onChange={handleFormChange}
                       placeholder="+264 61 000 0000"
                       className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -636,7 +650,6 @@ export default function CustomersPage() {
                   </div>
                 </div>
 
-                {/* Address */}
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">
                     Address
@@ -644,14 +657,13 @@ export default function CustomersPage() {
                   <input
                     type="text"
                     name="address"
-                    value={formData.address}
+                    value={formData.address ?? ""}
                     onChange={handleFormChange}
                     placeholder="Street address"
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
 
-                {/* City & Country Row */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -660,7 +672,7 @@ export default function CustomersPage() {
                     <input
                       type="text"
                       name="city"
-                      value={formData.city}
+                      value={formData.city ?? ""}
                       onChange={handleFormChange}
                       placeholder="City"
                       className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -673,7 +685,7 @@ export default function CustomersPage() {
                     <input
                       type="text"
                       name="country"
-                      value={formData.country}
+                      value={formData.country ?? ""}
                       onChange={handleFormChange}
                       placeholder="Country"
                       className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -681,7 +693,6 @@ export default function CustomersPage() {
                   </div>
                 </div>
 
-                {/* Notes */}
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">
                     Notes
@@ -689,7 +700,7 @@ export default function CustomersPage() {
                   <textarea
                     name="notes"
                     rows={3}
-                    value={formData.notes}
+                    value={formData.notes ?? ""}
                     onChange={handleFormChange}
                     placeholder="Additional notes about the customer..."
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -701,16 +712,18 @@ export default function CustomersPage() {
               <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
                 <button
                   type="button"
-                  onClick={() => setShowNewModal(false)}
+                  onClick={() => setShowModal(false)}
                   className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  disabled={isSaving}
+                  className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
                 >
-                  Create Customer
+                  {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {editingId ? "Save Changes" : "Create Customer"}
                 </button>
               </div>
             </form>

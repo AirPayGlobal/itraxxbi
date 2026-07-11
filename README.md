@@ -71,6 +71,37 @@ All authentication runs through Supabase Auth — there is no NextAuth and no Pr
 
 Client-side state is exposed via the `useAuth()` hook in `src/components/providers/session-provider.tsx`, which returns `{ user, session, profile, loading, signOut, refresh }`.
 
+## Data layer
+
+Feature pages read and write real data through Supabase using TanStack Query hooks
+in `src/lib/hooks/`. The pattern (see `use-customers.ts` as the reference):
+
+- `useX()` — `useQuery` selecting from the table
+- `useCreateX()` / `useUpdateX()` / `useDeleteX()` — `useMutation` calling Supabase,
+  invalidating the query, and surfacing a toast
+
+`QueryProvider` (`src/components/providers/query-provider.tsx`) wraps the app.
+The browser client is typed with `Database` from `src/lib/supabase/database.types.ts`.
+
+**Types:** `database.types.ts` is currently hand-written for the wired ("core slice")
+tables. Once the project is linked, regenerate the full, always-correct set with:
+
+```bash
+supabase gen types typescript --linked > src/lib/supabase/database.types.ts
+```
+
+Row types must be `type` aliases (not `interface`) — interfaces don't satisfy
+Supabase's `Record<string, unknown>` schema constraint and silently collapse
+inserts/updates to `never`.
+
+### Wiring status (core slice)
+
+| Module | Status |
+| --- | --- |
+| Customers | ✅ Wired to Supabase (full CRUD) |
+| Tasks, Job Cards, Invoices, Tickets | ⏳ Next (schema + hooks ready) |
+| All other modules | Mock/in-memory (prototype) |
+
 ## Database schema
 
 The full schema lives in `supabase/migrations/20260521000000_initial_schema.sql`. Key tables:

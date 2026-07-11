@@ -6,10 +6,11 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("en-NA", {
     style: "currency",
-    currency: "USD",
-  }).format(amount);
+    currency: "NAD",
+    currencyDisplay: "narrowSymbol",
+  }).format(amount ?? 0);
 }
 
 export function formatDate(date: Date | string): string {
