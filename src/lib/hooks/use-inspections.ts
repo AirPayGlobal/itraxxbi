@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { createNotification } from "@/lib/hooks/use-notifications";
 import type { VehicleInspectionRow } from "@/lib/supabase/database.types";
 
 const supabase = createClient();
@@ -20,6 +21,22 @@ async function currentUserId(): Promise<string | null> {
     data: { user },
   } = await supabase.auth.getUser();
   return user?.id ?? null;
+}
+
+// Recipients for a submitted checklist: users whose job title is Office
+// Administrator; if none are on file, fall back to ADMIN accounts.
+async function officeAdministratorIds(): Promise<string[]> {
+  const { data: admins } = await supabase
+    .from("profiles")
+    .select("id")
+    .ilike("job_title", "%office admin%");
+  if (admins && admins.length > 0) return admins.map((a) => a.id);
+
+  const { data: fallback } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("role", "ADMIN");
+  return (fallback ?? []).map((a) => a.id);
 }
 
 export function useInspections() {
@@ -58,13 +75,31 @@ export function useCreateInspection() {
         .select()
         .single();
       if (error) throw error;
+
+      // Submit: notify the Office Administrator(s) that a checklist is in.
+      const recipients = await officeAdministratorIds();
+      const label = data.reg_number || data.client_name || "a vehicle";
+      const by = data.technician_name ? ` by ${data.technician_name}` : "";
+      await Promise.all(
+        recipients.map((userId) =>
+          createNotification({
+            userId,
+            title: "Vehicle inspection submitted",
+            message: `Inspection checklist for ${label}${by} is ready for review.`,
+            type: "JOB",
+            link: "/inspections",
+          })
+        )
+      );
+
       return data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: KEY });
-      toast.success("Inspection saved");
+      toast.success("Checklist submitted to the Office Administrator");
     },
-    onError: (e: Error) => toast.error(e.message || "Failed to save inspection"),
+    onError: (e: Error) =>
+      toast.error(e.message || "Failed to submit inspection"),
   });
 }
 
