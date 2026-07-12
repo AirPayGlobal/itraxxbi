@@ -323,6 +323,77 @@ export type DocumentRow = Timestamps & {
   folder_id: string | null;
 };
 
+export type TrackerStatus = "NOT_INSTALLED" | "ACTIVE" | "INACTIVE" | "FAULTY";
+
+export type InspectionTypeEnum =
+  | "NEW_FITMENT"
+  | "RE_INSTALLATION"
+  | "DE_INSTALLATION"
+  | "REPAIR"
+  | "UPGRADE_ADDON";
+
+export type VehicleInspectionRow = Timestamps & {
+  id: string;
+  job_card_id: string | null;
+  customer_id: string | null;
+  vehicle_id: string | null;
+  inspection_date: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  device_no: string | null;
+  inspection_type: InspectionTypeEnum | null;
+  client_name: string | null;
+  insurer: string | null;
+  vehicle_make: string | null;
+  vehicle_model_year: string | null;
+  vehicle_color: string | null;
+  engine_number: string | null;
+  vin_number: string | null;
+  odo: string | null;
+  reg_number: string | null;
+  gps_imei: string | null;
+  gps_serial: string | null;
+  sim_number: string | null;
+  fuel_sensor_make: string | null;
+  fuel_sensor_length: string | null;
+  seal_no_1: string | null;
+  seal_no_2: string | null;
+  mdvr_make: string | null;
+  mdvr_serial: string | null;
+  mdvr_id: string | null;
+  remote_view: string | null;
+  condition_checks: Record<string, { pre: boolean; post: boolean }>;
+  radio_make: string | null;
+  extras: Record<string, boolean>;
+  anti_theft: Record<string, boolean>;
+  accessories: Record<string, boolean>;
+  accessories_other: string | null;
+  body_observations: string | null;
+  comments: string | null;
+  technician_name: string | null;
+  employee_code: string | null;
+  technician_signature: string | null;
+  witness_name: string | null;
+  signed_pre_check: boolean;
+  signed_post_check: boolean;
+  created_by_id: string | null;
+};
+
+export type VehicleRow = Timestamps & {
+  id: string;
+  registration_number: string;
+  make: string;
+  model: string;
+  year: number | null;
+  color: string | null;
+  vin: string | null;
+  tracker_device_id: string | null;
+  tracker_status: TrackerStatus;
+  last_service_date: string | null;
+  next_service_date: string | null;
+  customer_id: string;
+};
+
 export type NotificationType =
   | "INFO"
   | "WARNING"
@@ -472,6 +543,16 @@ export type Database = {
         NotificationRow,
         Insertable<NotificationRow>,
         Partial<NotificationRow>
+      >;
+      vehicles: TableConfig<
+        VehicleRow,
+        Insertable<VehicleRow>,
+        Partial<VehicleRow>
+      >;
+      vehicle_inspections: TableConfig<
+        VehicleInspectionRow,
+        Insertable<VehicleInspectionRow>,
+        Partial<VehicleInspectionRow>
       >;
     };
     Views: { [_ in never]: never };

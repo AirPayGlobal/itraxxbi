@@ -29,6 +29,7 @@ import {
   Funnel,
   UserCheck,
   FolderKanban,
+  ClipboardCheck,
 } from "lucide-react";
 
 const navigationItems = [
@@ -36,6 +37,7 @@ const navigationItems = [
   { label: "Projects", href: "/projects", icon: FolderKanban },
   { label: "Tasks", href: "/tasks", icon: CheckSquare },
   { label: "Job Cards", href: "/jobcards", icon: Wrench },
+  { label: "Inspections", href: "/inspections", icon: ClipboardCheck },
   { label: "Tickets", href: "/tickets", icon: Ticket },
   { label: "Customers", href: "/customers", icon: Users },
   { label: "Onboarding", href: "/customer-onboarding", icon: UserCheck },

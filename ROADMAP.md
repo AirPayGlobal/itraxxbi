@@ -10,6 +10,9 @@ wiring table.
   Tickets, Projects, Inventory, HR, Documents
 - Documents stored in a **private** Storage bucket, served via signed URLs
 - Role-based RLS: broad read, writes scoped by role (viewer / staff / manager+)
+- Company settings persistence; notifications (real bell + first producer)
+- **Vehicle Inspection / Checklist** — technician form + list capturing every
+  field on the ITRACKERX inspection sheet (`vehicle_inspections` table)
 
 ## 🔜 Next up (recommended order)
 - [x] **Role-based RLS** — scope writes by `profiles.role` *(done; read-tightening for HR/finance still open — see below)*
