@@ -101,7 +101,7 @@ inserts/updates to `never`.
 | Customers | ✅ Wired to Supabase (full CRUD) |
 | Tasks | ✅ Wired (CRUD, derived KPIs) |
 | Job Cards | ✅ Wired (CRUD, derived stats) |
-| Finance / Invoices | ✅ Invoices wired (create w/ line items, send, pay, delete). Expenses/Reports still mock |
+| Finance | ✅ Invoices + Expenses wired (CRUD, approve). Reports charts still mock |
 | Tickets | ✅ Wired (tickets + comment thread) |
 | Projects | ✅ Wired (CRUD; tasks/Gantt derived from tasks table) |
 | Inventory | ✅ Wired (assets CRUD, low-stock alerts) |

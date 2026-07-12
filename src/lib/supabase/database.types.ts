@@ -419,7 +419,7 @@ export type Database = {
       >;
       expenses: TableConfig<
         ExpenseRow,
-        Omit<ExpenseRow, "id" | "created_at"> & { created_at?: string },
+        Insertable<ExpenseRow>,
         Partial<ExpenseRow>
       >;
     };

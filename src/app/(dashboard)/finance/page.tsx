@@ -44,36 +44,42 @@ import {
   type InvoiceItemInput,
 } from "@/lib/hooks/use-invoices";
 import { useCustomers } from "@/lib/hooks/use-customers";
-import type { InvoiceStatus } from "@/lib/supabase/database.types";
+import {
+  useExpenses,
+  useCreateExpense,
+  useSetExpenseApproved,
+  useDeleteExpense,
+} from "@/lib/hooks/use-expenses";
+import type {
+  InvoiceStatus,
+  ExpenseCategory,
+} from "@/lib/supabase/database.types";
 
 // ---------------------------------------------------------------------------
-// Types (Expenses tab is still mock — no hook yet)
+// Mock Data — Reports charts only (not yet wired to Supabase)
 // ---------------------------------------------------------------------------
 
-interface Expense {
-  id: string;
-  description: string;
-  amount: number;
-  category: string;
-  date: string;
-  vendor: string;
-  approved: boolean;
-}
-
-// ---------------------------------------------------------------------------
-// Mock Data — Expenses & Reports only (not yet wired to Supabase)
-// ---------------------------------------------------------------------------
-
-const mockExpenses: Expense[] = [
-  { id: "1", description: "GPS Tracker Units (x50)", amount: 15000, category: "EQUIPMENT", date: "2026-02-01", vendor: "SinoTrack Global", approved: true },
-  { id: "2", description: "Vehicle fuel - Fleet A", amount: 2400, category: "FUEL", date: "2026-02-05", vendor: "Engen Namibia", approved: true },
-  { id: "3", description: "Office rent - February", amount: 8500, category: "RENT", date: "2026-02-01", vendor: "Windhoek Properties", approved: true },
-  { id: "4", description: "Soldering station & tools", amount: 1800, category: "EQUIPMENT", date: "2026-02-10", vendor: "RS Components", approved: true },
-  { id: "5", description: "Insurance premium - Q1", amount: 4500, category: "INSURANCE", date: "2026-02-15", vendor: "Old Mutual Namibia", approved: false },
-  { id: "6", description: "Staff salaries - February", amount: 45000, category: "SALARY", date: "2026-02-25", vendor: "Payroll", approved: true },
-  { id: "7", description: "Marketing - Google Ads", amount: 1200, category: "MARKETING", date: "2026-02-12", vendor: "Google LLC", approved: true },
-  { id: "8", description: "SIM cards for trackers (x100)", amount: 800, category: "EQUIPMENT", date: "2026-02-08", vendor: "MTC Namibia", approved: true },
+const EXPENSE_CATEGORIES: ExpenseCategory[] = [
+  "FUEL",
+  "MAINTENANCE",
+  "SALARY",
+  "RENT",
+  "UTILITIES",
+  "EQUIPMENT",
+  "TRAVEL",
+  "MARKETING",
+  "INSURANCE",
+  "OTHER",
 ];
+
+const emptyExpenseForm = {
+  description: "",
+  amount: "",
+  category: "OTHER" as ExpenseCategory,
+  date: "",
+  vendor: "",
+  notes: "",
+};
 
 const revenueByMonth = [
   { month: "Sep", revenue: 35000, expenses: 28000 },
@@ -131,6 +137,13 @@ export default function FinancePage() {
   const updateStatus = useUpdateInvoiceStatus();
   const deleteInvoice = useDeleteInvoice();
 
+  const { data: expenses = [], isLoading: expensesLoading } = useExpenses();
+  const createExpense = useCreateExpense();
+  const setExpenseApproved = useSetExpenseApproved();
+  const deleteExpense = useDeleteExpense();
+  const [showNewExpense, setShowNewExpense] = useState(false);
+  const [expenseForm, setExpenseForm] = useState(emptyExpenseForm);
+
   const [activeTab, setActiveTab] = useState<string>("Invoices");
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -178,14 +191,32 @@ export default function FinancePage() {
 
   const filteredExpenses = useMemo(() => {
     const query = searchQuery.toLowerCase();
-    return mockExpenses.filter(
+    return expenses.filter(
       (exp) =>
         query === "" ||
         exp.description.toLowerCase().includes(query) ||
-        exp.vendor.toLowerCase().includes(query) ||
+        (exp.vendor ?? "").toLowerCase().includes(query) ||
         exp.category.toLowerCase().includes(query)
     );
-  }, [searchQuery]);
+  }, [searchQuery, expenses]);
+
+  async function handleExpenseSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      await createExpense.mutateAsync({
+        description: expenseForm.description,
+        amount: parseFloat(expenseForm.amount) || 0,
+        category: expenseForm.category,
+        date: expenseForm.date,
+        vendor: expenseForm.vendor || null,
+        notes: expenseForm.notes || null,
+      });
+      setShowNewExpense(false);
+      setExpenseForm(emptyExpenseForm);
+    } catch {
+      /* handled in hook */
+    }
+  }
 
   // Line item computed totals (preview)
   const parsedItems = lineItems.map((li) => ({
@@ -599,7 +630,6 @@ export default function FinancePage() {
       )}
 
       {/* Expenses Tab */}
-      {/* TODO: expenses not yet wired to Supabase */}
       {activeTab === "Expenses" && (
         <>
           <div className="mb-6 flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
@@ -607,15 +637,24 @@ export default function FinancePage() {
               {filteredExpenses.length} expense{filteredExpenses.length !== 1 ? "s" : ""} &middot; Total:{" "}
               <span className="font-semibold">{formatCurrency(filteredExpenses.reduce((s, e) => s + e.amount, 0))}</span>
             </p>
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search expenses..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-10 pr-4 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search expenses..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-10 pr-4 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+              <button
+                onClick={() => setShowNewExpense(true)}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
+              >
+                <Plus className="h-4 w-4" />
+                Add Expense
+              </button>
             </div>
           </div>
 
@@ -642,43 +681,96 @@ export default function FinancePage() {
                     <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
                       Status
                     </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredExpenses.map((exp) => (
-                    <tr key={exp.id} className="hover:bg-slate-50">
-                      <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-slate-900">
-                        {exp.description}
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4">
-                        <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
-                          {exp.category}
-                        </span>
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-semibold text-slate-900">
-                        {formatCurrency(exp.amount)}
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
-                        {exp.vendor}
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
-                        {formatDate(exp.date)}
-                      </td>
-                      <td className="whitespace-nowrap px-6 py-4 text-center">
-                        {exp.approved ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
-                            <CheckCircle2 className="h-3 w-3" />
-                            Approved
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-yellow-50 px-2.5 py-0.5 text-xs font-medium text-yellow-700">
-                            <AlertCircle className="h-3 w-3" />
-                            Pending
-                          </span>
-                        )}
+                  {expensesLoading ? (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
+                        <Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin text-blue-500" />
+                        <p className="text-sm">Loading expenses…</p>
                       </td>
                     </tr>
-                  ))}
+                  ) : filteredExpenses.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
+                        <Receipt className="mx-auto mb-3 h-8 w-8 text-slate-300" />
+                        <p className="text-sm font-medium">No expenses recorded</p>
+                        <p className="mt-1 text-xs">
+                          Use &quot;Add Expense&quot; to record one.
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredExpenses.map((exp) => (
+                      <tr key={exp.id} className="hover:bg-slate-50">
+                        <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-slate-900">
+                          {exp.description}
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4">
+                          <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
+                            {exp.category}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-semibold text-slate-900">
+                          {formatCurrency(exp.amount)}
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
+                          {exp.vendor ?? "—"}
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-500">
+                          {formatDate(exp.date)}
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4 text-center">
+                          {exp.approved ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
+                              <CheckCircle2 className="h-3 w-3" />
+                              Approved
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-yellow-50 px-2.5 py-0.5 text-xs font-medium text-yellow-700">
+                              <AlertCircle className="h-3 w-3" />
+                              Pending
+                            </span>
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4">
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              title={exp.approved ? "Revoke approval" : "Approve"}
+                              disabled={setExpenseApproved.isPending}
+                              onClick={() =>
+                                setExpenseApproved.mutate({
+                                  id: exp.id,
+                                  approved: !exp.approved,
+                                })
+                              }
+                              className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-green-50 hover:text-green-600 disabled:opacity-50"
+                            >
+                              <CheckCircle2 className="h-4 w-4" />
+                            </button>
+                            <button
+                              title="Delete"
+                              onClick={() => {
+                                if (
+                                  window.confirm(
+                                    `Delete expense "${exp.description}"?`
+                                  )
+                                )
+                                  deleteExpense.mutate(exp.id);
+                              }}
+                              className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -1157,6 +1249,155 @@ export default function FinancePage() {
                 >
                   {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
                   Create Invoice
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Expense Modal */}
+      {showNewExpense && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setShowNewExpense(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-xl bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <h2 className="text-lg font-semibold text-slate-900">
+                Record Expense
+              </h2>
+              <button
+                onClick={() => setShowNewExpense(false)}
+                className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleExpenseSubmit}>
+              <div className="space-y-4 px-6 py-4">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Description <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={expenseForm.description}
+                    onChange={(e) =>
+                      setExpenseForm((p) => ({
+                        ...p,
+                        description: e.target.value,
+                      }))
+                    }
+                    placeholder="e.g. Office rent - March"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Amount (N$) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      step="0.01"
+                      value={expenseForm.amount}
+                      onChange={(e) =>
+                        setExpenseForm((p) => ({ ...p, amount: e.target.value }))
+                      }
+                      placeholder="0.00"
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Category <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={expenseForm.category}
+                      onChange={(e) =>
+                        setExpenseForm((p) => ({
+                          ...p,
+                          category: e.target.value as ExpenseCategory,
+                        }))
+                      }
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      {EXPENSE_CATEGORIES.map((c) => (
+                        <option key={c} value={c}>
+                          {c.charAt(0) + c.slice(1).toLowerCase()}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Date <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={expenseForm.date}
+                      onChange={(e) =>
+                        setExpenseForm((p) => ({ ...p, date: e.target.value }))
+                      }
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Vendor
+                    </label>
+                    <input
+                      type="text"
+                      value={expenseForm.vendor}
+                      onChange={(e) =>
+                        setExpenseForm((p) => ({ ...p, vendor: e.target.value }))
+                      }
+                      placeholder="Supplier / payee"
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Notes
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={expenseForm.notes}
+                    onChange={(e) =>
+                      setExpenseForm((p) => ({ ...p, notes: e.target.value }))
+                    }
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
+                <button
+                  type="button"
+                  onClick={() => setShowNewExpense(false)}
+                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={createExpense.isPending}
+                  className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {createExpense.isPending && (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  )}
+                  Record Expense
                 </button>
               </div>
             </form>
