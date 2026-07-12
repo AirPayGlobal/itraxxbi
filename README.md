@@ -105,7 +105,8 @@ inserts/updates to `never`.
 | Tickets | ✅ Wired (tickets + comment thread) |
 | Projects | ✅ Wired (CRUD; tasks/Gantt derived from tasks table) |
 | Inventory | ✅ Wired (assets CRUD, low-stock alerts) |
-| HR, Staff, Payslips, My-Portal | ⏳ Mock — tables exist for HR (employees/leave); Payslips needs a table |
+| HR | ✅ Wired (leave requests + employee directory, linked to profiles) |
+| Staff, Payslips, My-Portal | ⏳ Mock — Payslips needs a table |
 | Documents | ⏳ Mock — needs Supabase Storage for real files |
 | Settings | ⏳ Mock — only the company logo persists (localStorage) |
 | Customer-Onboarding, Sales-Pipeline | ⏳ Mock — no backing tables yet |
