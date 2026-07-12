@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { createNotification } from "@/lib/hooks/use-notifications";
 import type {
   EmployeeRow,
   LeaveRequestRow,
@@ -163,6 +164,16 @@ export function useSetLeaveStatus() {
         .select()
         .single();
       if (error) throw error;
+
+      // Notify the employee of the decision.
+      await createNotification({
+        userId: data.user_id,
+        title: `Leave request ${status.toLowerCase()}`,
+        message: `Your ${data.leave_type.toLowerCase()} leave (${data.start_date} – ${data.end_date}) was ${status.toLowerCase()}.`,
+        type: "LEAVE",
+        link: "/hr",
+      });
+
       return data;
     },
     onSuccess: (_data, vars) => {

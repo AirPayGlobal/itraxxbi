@@ -1,9 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/session-provider";
 import { cn, getInitials } from "@/lib/utils";
+import {
+  useNotifications,
+  useMarkNotificationRead,
+  useMarkAllNotificationsRead,
+} from "@/lib/hooks/use-notifications";
 import {
   Search,
   Bell,
@@ -11,7 +16,19 @@ import {
   Settings,
   LogOut,
   ChevronDown,
+  CheckCheck,
 } from "lucide-react";
+
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
 
 const routeTitles: Record<string, string> = {
   "/": "Dashboard",
@@ -54,22 +71,30 @@ interface HeaderProps {
 
 export function Header({ onOpenCommand }: HeaderProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, profile, signOut } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showNotifs, setShowNotifs] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  const { data: notifications = [] } = useNotifications();
+  const markRead = useMarkNotificationRead();
+  const markAllRead = useMarkAllNotificationsRead();
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   const pageTitle = getPageTitle(pathname);
-  const notificationCount = 3;
 
-  // Close dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (
-        userMenuRef.current &&
-        !userMenuRef.current.contains(event.target as Node)
-      ) {
+      const target = event.target as Node;
+      if (userMenuRef.current && !userMenuRef.current.contains(target)) {
         setShowUserMenu(false);
+      }
+      if (notifRef.current && !notifRef.current.contains(target)) {
+        setShowNotifs(false);
       }
     }
 
@@ -99,17 +124,78 @@ export function Header({ onOpenCommand }: HeaderProps) {
         </button>
 
         {/* Notification Bell */}
-        <button
-          className="relative rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
-          aria-label="Notifications"
-        >
-          <Bell className="h-5 w-5" />
-          {notificationCount > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-              {notificationCount > 9 ? "9+" : notificationCount}
-            </span>
+        <div className="relative" ref={notifRef}>
+          <button
+            onClick={() => setShowNotifs((v) => !v)}
+            className="relative rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+            aria-label="Notifications"
+          >
+            <Bell className="h-5 w-5" />
+            {unreadCount > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </button>
+
+          {showNotifs && (
+            <div className="absolute right-0 top-full mt-1 w-80 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
+              <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5">
+                <p className="text-sm font-semibold text-slate-900">
+                  Notifications
+                </p>
+                {unreadCount > 0 && (
+                  <button
+                    onClick={() => markAllRead.mutate()}
+                    className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700"
+                  >
+                    <CheckCheck className="h-3.5 w-3.5" />
+                    Mark all read
+                  </button>
+                )}
+              </div>
+              <div className="max-h-96 overflow-y-auto">
+                {notifications.length === 0 ? (
+                  <p className="px-4 py-8 text-center text-sm text-slate-400">
+                    No notifications yet
+                  </p>
+                ) : (
+                  notifications.map((n) => (
+                    <button
+                      key={n.id}
+                      onClick={() => {
+                        if (!n.is_read) markRead.mutate(n.id);
+                        if (n.link) {
+                          setShowNotifs(false);
+                          router.push(n.link);
+                        }
+                      }}
+                      className={cn(
+                        "flex w-full items-start gap-2 border-b border-slate-50 px-4 py-3 text-left transition-colors hover:bg-slate-50",
+                        !n.is_read && "bg-blue-50/40"
+                      )}
+                    >
+                      {!n.is_read && (
+                        <span className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-blue-500" />
+                      )}
+                      <div className={cn("min-w-0 flex-1", n.is_read && "pl-4")}>
+                        <p className="truncate text-sm font-medium text-slate-800">
+                          {n.title}
+                        </p>
+                        <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">
+                          {n.message}
+                        </p>
+                        <p className="mt-1 text-[11px] text-slate-400">
+                          {timeAgo(n.created_at)}
+                        </p>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
           )}
-        </button>
+        </div>
 
         {/* User Avatar & Dropdown */}
         <div className="relative" ref={userMenuRef}>

@@ -323,6 +323,30 @@ export type DocumentRow = Timestamps & {
   folder_id: string | null;
 };
 
+export type NotificationType =
+  | "INFO"
+  | "WARNING"
+  | "ERROR"
+  | "SUCCESS"
+  | "TASK"
+  | "JOB"
+  | "LEAVE"
+  | "DOCUMENT"
+  | "FINANCE";
+export type NotificationChannel = "APP" | "EMAIL" | "WHATSAPP" | "SMS";
+
+export type NotificationRow = {
+  id: string;
+  user_id: string;
+  title: string;
+  message: string;
+  type: NotificationType;
+  channel: NotificationChannel;
+  is_read: boolean;
+  link: string | null;
+  created_at: string;
+};
+
 export type CompanySettingsRow = {
   id: string;
   company_name: string | null;
@@ -443,6 +467,11 @@ export type Database = {
         CompanySettingsRow,
         Partial<CompanySettingsRow> & { id?: string },
         Partial<CompanySettingsRow>
+      >;
+      notifications: TableConfig<
+        NotificationRow,
+        Insertable<NotificationRow>,
+        Partial<NotificationRow>
       >;
     };
     Views: { [_ in never]: never };
