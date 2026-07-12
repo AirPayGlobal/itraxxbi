@@ -47,5 +47,6 @@ wiring table.
 ## 🚀 Domain features not started
 - [ ] Live vehicle tracking / map view / device telemetry / geofencing
 - [ ] Invoice & document **PDF generation** ("Download PDF" has no generator)
-- [ ] Transactional **email** (invoice send, password reset delivery/templates)
+- [x] Transactional **email** wired (TransactMail) — inspection approval emails the client
+- [ ] Extend email to invoice send + password-reset templates
 - [ ] AI features (TRAXX, Meeting-AI) — currently simulated; Meeting-AI also needs speech-to-text

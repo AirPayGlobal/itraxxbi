@@ -104,9 +104,9 @@ export function useCreateInspection() {
   });
 }
 
-// Office Administrator approves a submitted checklist, which dispatches it to
-// the client. Resolves the client email from the linked customer when not
-// supplied; records who sent it and when, and notifies the technician.
+// Office Administrator approves a submitted checklist. Delegates to a
+// server route that emails the report to the client (keeping the email API
+// key server-side) and records the dispatch.
 export function useApproveInspection() {
   const qc = useQueryClient();
   return useMutation({
@@ -116,57 +116,21 @@ export function useApproveInspection() {
     }: {
       inspection: VehicleInspection;
       clientEmail?: string;
-    }): Promise<VehicleInspection> => {
-      let email = clientEmail?.trim() || inspection.client_email || null;
-      if (!email && inspection.customer_id) {
-        const { data: customer } = await supabase
-          .from("customers")
-          .select("email")
-          .eq("id", inspection.customer_id)
-          .single();
-        email = customer?.email ?? null;
+    }): Promise<{ email: string }> => {
+      const res = await fetch("/api/inspections/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inspectionId: inspection.id, clientEmail }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.error || "Failed to send inspection");
       }
-      if (!email) {
-        throw new Error(
-          "No client email on file — add one before sending to the client."
-        );
-      }
-
-      const approvedBy = await currentUserId();
-      const now = new Date().toISOString();
-      const { data, error } = await supabase
-        .from("vehicle_inspections")
-        .update({
-          status: "APPROVED",
-          approved_by_id: approvedBy,
-          approved_at: now,
-          sent_to_client_at: now,
-          client_email: email,
-        })
-        .eq("id", inspection.id)
-        .select()
-        .single();
-      if (error) throw error;
-
-      // TODO(email): actual delivery to `email` requires an email provider
-      // (Edge Function + Resend/SES). For now the dispatch is recorded here.
-
-      if (data.created_by_id) {
-        await createNotification({
-          userId: data.created_by_id,
-          title: "Inspection approved & sent to client",
-          message: `Your inspection for ${
-            data.reg_number || data.client_name || "a vehicle"
-          } was approved and sent to ${email}.`,
-          type: "JOB",
-          link: "/inspections",
-        });
-      }
-      return data;
+      return { email: payload.email };
     },
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: KEY });
-      toast.success(`Approved and sent to ${data.client_email}`);
+      toast.success(`Approved and emailed to ${data.email}`);
     },
     onError: (e: Error) =>
       toast.error(e.message || "Failed to approve inspection"),

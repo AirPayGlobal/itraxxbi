@@ -19,13 +19,19 @@ npm install
 
 ### 2. Configure environment
 
-The app reads three environment variables. Set them in your host (Vercel, etc.) or in a local `.env.local`:
+Set these in your host (Vercel, etc.) or in a local `.env.local` (gitignored):
 
 | Variable | Value |
 | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://xhmkchduceqpubqplzcg.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_PXepzY5a9a8FtB_c8uNl1A_AHpdwELh` |
 | `DATABASE_URL` *(server-side migrations only)* | `postgresql://postgres:[YOUR-PASSWORD]@db.xhmkchduceqpubqplzcg.supabase.co:5432/postgres` |
+| `TRANSACTMAIL_API_KEY` *(server-side only — secret)* | TransactMail API key. Powers outbound email (e.g. inspection reports to clients). **Never** expose to the browser. |
+| `TRANSACTMAIL_BASE_URL` *(optional)* | Defaults to `https://email-service.airpayglobal.com/v1` |
+| `TRANSACTMAIL_SENDER` *(optional)* | From-address for outbound email (must be authorised with the provider). Defaults to `no-reply@airpayglobal.com` |
+
+Email is sent only from server code (`src/lib/email.ts`, used by the
+`/api/inspections/send` route) so the key never reaches the client.
 
 ### 3. Link the Supabase project (one-time)
 
