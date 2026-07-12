@@ -1,12 +1,14 @@
 -- =============================================================
 -- Storage bucket for the Documents module.
--- Files are uploaded to the "documents" bucket; the public URL (or a
--- signed URL) is stored in public.documents.file_url.
+-- PRIVATE bucket: documents can be CONFIDENTIAL/RESTRICTED, so objects are
+-- NOT publicly readable. public.documents.file_url stores the object *path*;
+-- the app serves files through short-lived signed URLs. Access is gated by
+-- the authenticated-only RLS policies below.
 -- =============================================================
 
 insert into storage.buckets (id, name, public)
-values ('documents', 'documents', true)
-on conflict (id) do nothing;
+values ('documents', 'documents', false)
+on conflict (id) do update set public = false;
 
 -- Authenticated users may read/write objects in the documents bucket.
 create policy "authenticated read documents bucket"

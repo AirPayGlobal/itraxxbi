@@ -108,7 +108,7 @@ inserts/updates to `never`.
 | Inventory | ✅ Wired (assets CRUD, low-stock alerts) |
 | HR | ✅ Wired (leave requests + employee directory, linked to profiles) |
 | Staff, Payslips, My-Portal | ⏳ Mock — Payslips needs a table |
-| Documents | ✅ Wired (real upload/download via Supabase Storage) |
+| Documents | ✅ Wired — upload to a **private** Storage bucket, served via signed URLs |
 | Settings | ⏳ Mock — only the company logo persists (localStorage) |
 | Customer-Onboarding, Sales-Pipeline | ⏳ Mock — no backing tables yet |
 | TRAXX, Meeting-AI | Simulated by design (no LLM) |

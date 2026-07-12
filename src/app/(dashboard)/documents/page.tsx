@@ -27,6 +27,7 @@ import {
   useDocuments,
   useUploadDocument,
   useDeleteDocument,
+  getDocumentSignedUrl,
   type Document,
 } from "@/lib/hooks/use-documents";
 import { useProfiles } from "@/lib/hooks/use-hr";
@@ -306,6 +307,16 @@ export default function DocumentsPage() {
     }
   }
 
+  async function handleOpen(doc: Document, download: boolean) {
+    try {
+      const url = await getDocumentSignedUrl(doc, { download });
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch {
+      const { toast } = await import("sonner");
+      toast.error("Could not open the file. Please try again.");
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -569,25 +580,20 @@ export default function DocumentsPage() {
 
                         <td className="whitespace-nowrap px-4 py-3">
                           <div className="flex items-center justify-center gap-1">
-                            <a
+                            <button
                               title="View"
-                              href={doc.file_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                              onClick={() => handleOpen(doc, false)}
                               className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-blue-600"
                             >
                               <Eye className="h-4 w-4" />
-                            </a>
-                            <a
+                            </button>
+                            <button
                               title="Download"
-                              href={doc.file_url}
-                              download={doc.file_name}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                              onClick={() => handleOpen(doc, true)}
                               className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-green-600"
                             >
                               <Download className="h-4 w-4" />
-                            </a>
+                            </button>
                             <button
                               title="Delete"
                               onClick={() => handleDelete(doc)}

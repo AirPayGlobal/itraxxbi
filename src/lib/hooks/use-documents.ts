@@ -63,17 +63,15 @@ export function useUploadDocument() {
         });
       if (uploadError) throw uploadError;
 
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from(BUCKET).getPublicUrl(path);
-
+      // Private bucket — store the object PATH, not a public URL. Files are
+      // served on demand through signed URLs (see getDocumentSignedUrl).
       const { data, error } = await supabase
         .from("documents")
         .insert({
           name: input.name || file.name,
           description: input.description ?? null,
           file_name: file.name,
-          file_url: publicUrl,
+          file_url: path,
           file_size: file.size,
           mime_type: file.type || null,
           category: input.category ?? "GENERAL",
@@ -100,16 +98,28 @@ export function useUploadDocument() {
   });
 }
 
+// Generate a short-lived signed URL for viewing or downloading an object.
+// `doc.file_url` holds the storage object path (private bucket).
+export async function getDocumentSignedUrl(
+  doc: Document,
+  { download = false }: { download?: boolean | string } = {}
+): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrl(doc.file_url, 300, {
+      download: download === true ? doc.file_name : download || undefined,
+    });
+  if (error) throw error;
+  return data.signedUrl;
+}
+
 export function useDeleteDocument() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (doc: Document): Promise<void> => {
-      // Best-effort remove of the stored object (path derived from the URL).
-      const marker = `/object/public/${BUCKET}/`;
-      const idx = doc.file_url.indexOf(marker);
-      if (idx !== -1) {
-        const path = decodeURIComponent(doc.file_url.slice(idx + marker.length));
-        await supabase.storage.from(BUCKET).remove([path]);
+      // Remove the stored object (file_url is the object path).
+      if (doc.file_url) {
+        await supabase.storage.from(BUCKET).remove([doc.file_url]);
       }
       const { error } = await supabase.from("documents").delete().eq("id", doc.id);
       if (error) throw error;
