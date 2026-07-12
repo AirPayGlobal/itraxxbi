@@ -198,6 +198,144 @@ export type TicketCommentRow = {
   created_at: string;
 }
 
+export type AssetCategory =
+  | "TRACKING_DEVICE"
+  | "VEHICLE"
+  | "TOOL"
+  | "SPARE_PART"
+  | "OFFICE_EQUIPMENT"
+  | "IT_EQUIPMENT"
+  | "OTHER";
+export type AssetStatus =
+  | "AVAILABLE"
+  | "ASSIGNED"
+  | "IN_USE"
+  | "MAINTENANCE"
+  | "RETIRED"
+  | "LOST";
+export type ContractType =
+  | "PERMANENT"
+  | "FIXED_TERM"
+  | "PART_TIME"
+  | "CONTRACTOR";
+export type LeaveType =
+  | "ANNUAL"
+  | "SICK"
+  | "COMPASSIONATE"
+  | "MATERNITY"
+  | "PATERNITY"
+  | "UNPAID"
+  | "STUDY";
+export type LeaveStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
+export type DocCategory =
+  | "CONTRACT"
+  | "CERTIFICATE"
+  | "REGISTRATION"
+  | "COMPLIANCE"
+  | "SOP"
+  | "INVOICE"
+  | "REPORT"
+  | "GENERAL";
+export type DocAccess = "PUBLIC" | "INTERNAL" | "RESTRICTED" | "CONFIDENTIAL";
+export type ExpenseCategory =
+  | "FUEL"
+  | "MAINTENANCE"
+  | "SALARY"
+  | "RENT"
+  | "UTILITIES"
+  | "EQUIPMENT"
+  | "TRAVEL"
+  | "MARKETING"
+  | "INSURANCE"
+  | "OTHER";
+
+export type AssetRow = Timestamps & {
+  id: string;
+  name: string;
+  asset_number: string;
+  serial_number: string | null;
+  category: AssetCategory;
+  status: AssetStatus;
+  purchase_date: string | null;
+  purchase_price: number | null;
+  current_value: number | null;
+  depreciation_rate: number | null;
+  location: string | null;
+  barcode: string | null;
+  quantity: number;
+  min_stock_level: number | null;
+  notes: string | null;
+};
+
+export type EmployeeRow = Timestamps & {
+  id: string;
+  user_id: string;
+  employee_number: string;
+  date_of_birth: string | null;
+  start_date: string;
+  end_date: string | null;
+  contract_type: ContractType;
+  salary: number | null;
+  bank_name: string | null;
+  bank_account: string | null;
+  tax_number: string | null;
+  emergency_contact: string | null;
+  emergency_phone: string | null;
+  annual_leave_balance: number;
+  sick_leave_balance: number;
+  compassionate_leave_balance: number;
+};
+
+export type LeaveRequestRow = Timestamps & {
+  id: string;
+  user_id: string;
+  leave_type: LeaveType;
+  start_date: string;
+  end_date: string;
+  days: number;
+  reason: string | null;
+  status: LeaveStatus;
+  approved_by_id: string | null;
+  approved_at: string | null;
+};
+
+export type FolderRow = {
+  id: string;
+  name: string;
+  parent_id: string | null;
+  created_at: string;
+};
+
+export type DocumentRow = Timestamps & {
+  id: string;
+  name: string;
+  description: string | null;
+  file_name: string;
+  file_url: string;
+  file_size: number | null;
+  mime_type: string | null;
+  category: DocCategory;
+  version: number;
+  expiry_date: string | null;
+  access_level: DocAccess;
+  uploaded_by_id: string;
+  customer_id: string | null;
+  folder_id: string | null;
+};
+
+export type ExpenseRow = {
+  id: string;
+  description: string;
+  amount: number;
+  category: ExpenseCategory;
+  date: string;
+  vendor: string | null;
+  receipt: string | null;
+  approved: boolean;
+  notes: string | null;
+  created_at: string;
+};
+
 type TableConfig<Row, Insert, Update> = {
   Row: Row;
   Insert: Insert;
@@ -258,6 +396,32 @@ export type Database = {
         Omit<TicketCommentRow, "id" | "created_at"> & { created_at?: string },
         Partial<TicketCommentRow>
       >;
+      assets: TableConfig<AssetRow, Insertable<AssetRow>, Partial<AssetRow>>;
+      employees: TableConfig<
+        EmployeeRow,
+        Insertable<EmployeeRow>,
+        Partial<EmployeeRow>
+      >;
+      leave_requests: TableConfig<
+        LeaveRequestRow,
+        Insertable<LeaveRequestRow>,
+        Partial<LeaveRequestRow>
+      >;
+      folders: TableConfig<
+        FolderRow,
+        Omit<FolderRow, "id" | "created_at"> & { created_at?: string },
+        Partial<FolderRow>
+      >;
+      documents: TableConfig<
+        DocumentRow,
+        Insertable<DocumentRow>,
+        Partial<DocumentRow>
+      >;
+      expenses: TableConfig<
+        ExpenseRow,
+        Omit<ExpenseRow, "id" | "created_at"> & { created_at?: string },
+        Partial<ExpenseRow>
+      >;
     };
     Views: { [_ in never]: never };
     Functions: { [_ in never]: never };
@@ -274,6 +438,14 @@ export type Database = {
       ticket_status: TicketStatus;
       ticket_priority: TicketPriority;
       ticket_category: TicketCategory;
+      asset_category: AssetCategory;
+      asset_status: AssetStatus;
+      contract_type: ContractType;
+      leave_type: LeaveType;
+      leave_status: LeaveStatus;
+      doc_category: DocCategory;
+      doc_access: DocAccess;
+      expense_category: ExpenseCategory;
     };
     CompositeTypes: { [_ in never]: never };
   };
