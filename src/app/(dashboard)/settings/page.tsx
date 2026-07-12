@@ -27,6 +27,10 @@ import {
 } from "lucide-react";
 import { cn, getInitials } from "@/lib/utils";
 import { toast } from "sonner";
+import {
+  useCompanySettings,
+  useSaveCompanySettings,
+} from "@/lib/hooks/use-company-settings";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -111,20 +115,23 @@ function SaveBar({ onSave }: { onSave: () => void }) {
 // ---------------------------------------------------------------------------
 
 function CompanyTab() {
+  const { data: settings } = useCompanySettings();
+  const saveSettings = useSaveCompanySettings();
+
   const [saved, setSaved] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [companyName, setCompanyName] = useState("iTraxx BI");
-  const [regNumber, setRegNumber] = useState("CC/2022/004812");
+  const [companyName, setCompanyName] = useState("");
+  const [regNumber, setRegNumber] = useState("");
   const [industry, setIndustry] = useState("fleet");
   const [companySize, setCompanySize] = useState("11-50");
-  const [primaryEmail, setPrimaryEmail] = useState("info@itraxxbi.com.na");
-  const [phoneNumber, setPhoneNumber] = useState("+264 61 000 0000");
-  const [website, setWebsite] = useState("https://itraxxbi.com.na");
+  const [primaryEmail, setPrimaryEmail] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [website, setWebsite] = useState("");
   const [country, setCountry] = useState("NA");
-  const [address, setAddress] = useState("12 Independence Ave, Windhoek, 10001");
-  const [vatNumber, setVatNumber] = useState("NAM-VAT-00123456");
+  const [address, setAddress] = useState("");
+  const [vatNumber, setVatNumber] = useState("");
   const [currency, setCurrency] = useState("NAD");
   const [timezone, setTimezone] = useState("Africa/Windhoek");
 
@@ -132,6 +139,23 @@ function CompanyTab() {
     const stored = localStorage.getItem("company-logo");
     if (stored) setLogoUrl(stored);
   }, []);
+
+  // Seed the form once the saved settings load.
+  useEffect(() => {
+    if (!settings) return;
+    setCompanyName(settings.company_name ?? "");
+    setRegNumber(settings.reg_number ?? "");
+    setIndustry(settings.industry ?? "fleet");
+    setCompanySize(settings.company_size ?? "11-50");
+    setPrimaryEmail(settings.primary_email ?? "");
+    setPhoneNumber(settings.phone_number ?? "");
+    setWebsite(settings.website ?? "");
+    setCountry(settings.country ?? "NA");
+    setAddress(settings.address ?? "");
+    setVatNumber(settings.vat_number ?? "");
+    setCurrency(settings.currency ?? "NAD");
+    setTimezone(settings.timezone ?? "Africa/Windhoek");
+  }, [settings]);
 
   const handleLogoUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -161,10 +185,27 @@ function CompanyTab() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, []);
 
-  const handleSave = () => {
-    setSaved(true);
-    toast.success("Company profile saved successfully.");
-    setTimeout(() => setSaved(false), 2500);
+  const handleSave = async () => {
+    try {
+      await saveSettings.mutateAsync({
+        company_name: companyName || null,
+        reg_number: regNumber || null,
+        industry,
+        company_size: companySize,
+        primary_email: primaryEmail || null,
+        phone_number: phoneNumber || null,
+        website: website || null,
+        country,
+        address: address || null,
+        vat_number: vatNumber || null,
+        currency,
+        timezone,
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch {
+      /* toast handled in the hook */
+    }
   };
 
   return (

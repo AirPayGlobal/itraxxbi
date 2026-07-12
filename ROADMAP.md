@@ -13,7 +13,7 @@ wiring table.
 
 ## 🔜 Next up (recommended order)
 - [x] **Role-based RLS** — scope writes by `profiles.role` *(done; read-tightening for HR/finance still open — see below)*
-- [ ] **Settings persistence** — `company_settings` table so Save actually saves; real password change, avatar upload
+- [x] **Settings persistence** — company profile now saved to a `company_settings` table *(Account/password change, avatar upload still stubbed)*
 - [ ] **Notifications** — create + read from the `notifications` table; wire the header bell (currently hardcoded to 3)
 - [ ] **Vehicles UI** — list/track a customer's vehicles (core to a GPS-tracking business)
 

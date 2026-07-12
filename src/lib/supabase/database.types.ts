@@ -323,6 +323,23 @@ export type DocumentRow = Timestamps & {
   folder_id: string | null;
 };
 
+export type CompanySettingsRow = {
+  id: string;
+  company_name: string | null;
+  reg_number: string | null;
+  industry: string | null;
+  company_size: string | null;
+  primary_email: string | null;
+  phone_number: string | null;
+  website: string | null;
+  country: string | null;
+  address: string | null;
+  vat_number: string | null;
+  currency: string | null;
+  timezone: string | null;
+  updated_at: string;
+};
+
 export type ExpenseRow = {
   id: string;
   description: string;
@@ -421,6 +438,11 @@ export type Database = {
         ExpenseRow,
         Insertable<ExpenseRow>,
         Partial<ExpenseRow>
+      >;
+      company_settings: TableConfig<
+        CompanySettingsRow,
+        Partial<CompanySettingsRow> & { id?: string },
+        Partial<CompanySettingsRow>
       >;
     };
     Views: { [_ in never]: never };
