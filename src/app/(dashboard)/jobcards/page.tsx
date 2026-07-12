@@ -1,147 +1,45 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { toast } from "sonner";
 import {
   Plus,
   Search,
   Briefcase,
   Clock,
   CheckCircle2,
-  DollarSign,
+  ClipboardList,
   Eye,
   Pencil,
+  Trash2,
   X,
   ChevronDown,
   Wrench,
+  Loader2,
 } from "lucide-react";
 import {
   cn,
   getStatusColor,
   getPriorityColor,
   formatDate,
-  formatCurrency,
 } from "@/lib/utils";
+import {
+  useJobCards,
+  useCreateJobCard,
+  useUpdateJobCard,
+  useDeleteJobCard,
+  type JobCard,
+  type JobCardInput,
+} from "@/lib/hooks/use-job-cards";
+import { useCustomers } from "@/lib/hooks/use-customers";
+import type {
+  JobStatus,
+  JobType,
+  Priority,
+} from "@/lib/supabase/database.types";
 
 // ---------------------------------------------------------------------------
-// Types
+// Constants
 // ---------------------------------------------------------------------------
-
-interface JobCard {
-  id: string;
-  jobNumber: string;
-  title: string;
-  customer: string;
-  technician: string;
-  jobType: string;
-  status: string;
-  priority: string;
-  scheduledDate: string;
-  estimatedHours: number;
-}
-
-// ---------------------------------------------------------------------------
-// Mock Data
-// ---------------------------------------------------------------------------
-
-const INITIAL_JOB_CARDS: JobCard[] = [
-  {
-    id: "1",
-    jobNumber: "JC-2602-0001",
-    title: "GPS Tracker Installation - Toyota Hilux",
-    customer: "Namibia Breweries",
-    technician: "John Mutua",
-    jobType: "INSTALLATION",
-    status: "OPEN",
-    priority: "HIGH",
-    scheduledDate: "2026-02-22",
-    estimatedHours: 3,
-  },
-  {
-    id: "2",
-    jobNumber: "JC-2602-0002",
-    title: "Fleet Maintenance Check - 5 Vehicles",
-    customer: "TransNamib Holdings",
-    technician: "James Shilongo",
-    jobType: "MAINTENANCE",
-    status: "IN_PROGRESS",
-    priority: "MEDIUM",
-    scheduledDate: "2026-02-21",
-    estimatedHours: 8,
-  },
-  {
-    id: "3",
-    jobNumber: "JC-2602-0003",
-    title: "Tracker Repair - Ford Ranger",
-    customer: "Pupkewitz Motors",
-    technician: "John Mutua",
-    jobType: "REPAIR",
-    status: "ASSIGNED",
-    priority: "URGENT",
-    scheduledDate: "2026-02-21",
-    estimatedHours: 2,
-  },
-  {
-    id: "4",
-    jobNumber: "JC-2602-0004",
-    title: "Vehicle Inspection - Annual",
-    customer: "Ohlthaver & List",
-    technician: "James Shilongo",
-    jobType: "INSPECTION",
-    status: "COMPLETED",
-    priority: "LOW",
-    scheduledDate: "2026-02-18",
-    estimatedHours: 4,
-  },
-  {
-    id: "5",
-    jobNumber: "JC-2602-0005",
-    title: "Install Dash Cam + Tracker",
-    customer: "Namibia Logistics",
-    technician: "Peter Angula",
-    jobType: "INSTALLATION",
-    status: "IN_PROGRESS",
-    priority: "HIGH",
-    scheduledDate: "2026-02-20",
-    estimatedHours: 5,
-  },
-  {
-    id: "6",
-    jobNumber: "JC-2602-0006",
-    title: "Remove old tracker - Isuzu KB",
-    customer: "Meat Corp Namibia",
-    technician: "Peter Angula",
-    jobType: "REMOVAL",
-    status: "INVOICED",
-    priority: "LOW",
-    scheduledDate: "2026-02-15",
-    estimatedHours: 1,
-  },
-  {
-    id: "7",
-    jobNumber: "JC-2602-0007",
-    title: "Emergency Repair - Signal Lost",
-    customer: "Namibia Breweries",
-    technician: "John Mutua",
-    jobType: "REPAIR",
-    status: "OPEN",
-    priority: "URGENT",
-    scheduledDate: "2026-02-22",
-    estimatedHours: 2,
-  },
-  {
-    id: "8",
-    jobNumber: "JC-2602-0008",
-    title: "Quarterly Fleet Inspection",
-    customer: "Bank Windhoek",
-    technician: "James Shilongo",
-    jobType: "INSPECTION",
-    status: "ASSIGNED",
-    priority: "MEDIUM",
-    scheduledDate: "2026-02-24",
-    estimatedHours: 6,
-  },
-];
 
 const STATUS_OPTIONS = [
   "All",
@@ -150,6 +48,7 @@ const STATUS_OPTIONS = [
   "IN_PROGRESS",
   "COMPLETED",
   "INVOICED",
+  "CANCELLED",
 ] as const;
 
 const JOB_TYPE_OPTIONS = [
@@ -159,33 +58,60 @@ const JOB_TYPE_OPTIONS = [
   "REPAIR",
   "INSPECTION",
   "REMOVAL",
+  "OTHER",
 ] as const;
 
 const PRIORITY_OPTIONS = ["All", "LOW", "MEDIUM", "HIGH", "URGENT"] as const;
 
-const CUSTOMERS = [
-  "Namibia Breweries",
-  "TransNamib Holdings",
-  "Pupkewitz Motors",
-  "Ohlthaver & List",
-  "Namibia Logistics",
-  "Meat Corp Namibia",
-  "Bank Windhoek",
+const JOB_TYPE_VALUES: JobType[] = [
+  "INSTALLATION",
+  "MAINTENANCE",
+  "REPAIR",
+  "INSPECTION",
+  "REMOVAL",
+  "OTHER",
 ];
 
-const VEHICLES = [
-  "Toyota Hilux - N 1234 WB",
-  "Ford Ranger - N 5678 WB",
-  "Isuzu KB - N 9012 WB",
-  "Toyota Land Cruiser - N 3456 WB",
-  "Nissan NP300 - N 7890 WB",
+const PRIORITY_VALUES: Priority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
+
+const STATUS_VALUES: JobStatus[] = [
+  "OPEN",
+  "ASSIGNED",
+  "IN_PROGRESS",
+  "COMPLETED",
+  "INVOICED",
+  "CANCELLED",
 ];
 
-const TECHNICIANS = ["John Mutua", "James Shilongo", "Peter Angula"];
+// ---------------------------------------------------------------------------
+// Form types & helpers
+// ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// Helper – readable labels
-// ---------------------------------------------------------------------------
+interface JobCardFormData {
+  title: string;
+  description: string;
+  job_type: JobType;
+  priority: Priority;
+  status: JobStatus;
+  customer_id: string;
+  scheduled_date: string;
+  estimated_hours: string;
+  location: string;
+  notes: string;
+}
+
+const emptyForm: JobCardFormData = {
+  title: "",
+  description: "",
+  job_type: "INSTALLATION",
+  priority: "MEDIUM",
+  status: "OPEN",
+  customer_id: "",
+  scheduled_date: "",
+  estimated_hours: "",
+  location: "",
+  notes: "",
+};
 
 function formatLabel(value: string): string {
   return value
@@ -210,6 +136,7 @@ function getJobTypeBadgeColor(type: string): string {
     REPAIR: "bg-rose-100 text-rose-800",
     INSPECTION: "bg-cyan-100 text-cyan-800",
     REMOVAL: "bg-slate-100 text-slate-700",
+    OTHER: "bg-gray-100 text-gray-800",
   };
   return map[type] || "bg-gray-100 text-gray-800";
 }
@@ -219,8 +146,11 @@ function getJobTypeBadgeColor(type: string): string {
 // ---------------------------------------------------------------------------
 
 export default function JobCardsPage() {
-  // Job cards state
-  const [jobCards, setJobCards] = useState<JobCard[]>(INITIAL_JOB_CARDS);
+  const { data: jobCards = [], isLoading, isError, error } = useJobCards();
+  const { data: customers = [] } = useCustomers();
+  const createJobCard = useCreateJobCard();
+  const updateJobCard = useUpdateJobCard();
+  const deleteJobCard = useDeleteJobCard();
 
   // Selected job for detail drawer
   const [selectedJob, setSelectedJob] = useState<JobCard | null>(null);
@@ -231,37 +161,32 @@ export default function JobCardsPage() {
   const [priorityFilter, setPriorityFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Modal
+  // Modal / form
   const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formData, setFormData] = useState<JobCardFormData>(emptyForm);
 
-  // Form state
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    jobType: "INSTALLATION",
-    priority: "MEDIUM",
-    customer: "",
-    vehicle: "",
-    technician: "",
-    scheduledDate: "",
-    estimatedHours: "",
-    location: "",
-  });
+  // Customer id -> name lookup
+  const customerName = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of customers) map.set(c.id, c.name);
+    return (id: string | null) => (id ? map.get(id) ?? "—" : "—");
+  }, [customers]);
 
   // Filtering logic
   const filteredJobCards = useMemo(() => {
     return jobCards.filter((job) => {
       if (statusFilter !== "All" && job.status !== statusFilter) return false;
-      if (jobTypeFilter !== "All" && job.jobType !== jobTypeFilter) return false;
+      if (jobTypeFilter !== "All" && job.job_type !== jobTypeFilter)
+        return false;
       if (priorityFilter !== "All" && job.priority !== priorityFilter)
         return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const searchable = [
-          job.jobNumber,
+          job.job_number,
           job.title,
-          job.customer,
-          job.technician,
+          customerName(job.customer_id),
         ]
           .join(" ")
           .toLowerCase();
@@ -269,7 +194,57 @@ export default function JobCardsPage() {
       }
       return true;
     });
-  }, [jobCards, statusFilter, jobTypeFilter, priorityFilter, searchQuery]);
+  }, [
+    jobCards,
+    statusFilter,
+    jobTypeFilter,
+    priorityFilter,
+    searchQuery,
+    customerName,
+  ]);
+
+  // Derived stats
+  const stats = useMemo(() => {
+    const inProgress = jobCards.filter(
+      (j) => j.status === "IN_PROGRESS"
+    ).length;
+    const completed = jobCards.filter(
+      (j) => j.status === "COMPLETED" || j.status === "INVOICED"
+    ).length;
+    const open = jobCards.filter(
+      (j) => j.status === "OPEN" || j.status === "ASSIGNED"
+    ).length;
+    return [
+      {
+        label: "Total Jobs",
+        value: String(jobCards.length),
+        icon: Briefcase,
+        iconBg: "bg-blue-50",
+        iconColor: "text-blue-600",
+      },
+      {
+        label: "In Progress",
+        value: String(inProgress),
+        icon: Clock,
+        iconBg: "bg-amber-50",
+        iconColor: "text-amber-600",
+      },
+      {
+        label: "Completed",
+        value: String(completed),
+        icon: CheckCircle2,
+        iconBg: "bg-green-50",
+        iconColor: "text-green-600",
+      },
+      {
+        label: "Open / Assigned",
+        value: String(open),
+        icon: ClipboardList,
+        iconBg: "bg-emerald-50",
+        iconColor: "text-emerald-600",
+      },
+    ];
+  }, [jobCards]);
 
   // Handlers
   function handleFormChange(
@@ -280,44 +255,77 @@ export default function JobCardsPage() {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-
-    // Generate a sequential job number based on existing cards
-    const nextNum = jobCards.length + 1;
-    const jobNumber = `JC-2602-${String(nextNum).padStart(4, "0")}`;
-
-    const newJobCard: JobCard = {
-      id: String(Date.now()),
-      jobNumber,
-      title: formData.title,
-      customer: formData.customer,
-      technician: formData.technician,
-      jobType: formData.jobType,
-      status: "OPEN",
-      priority: formData.priority,
-      scheduledDate: formData.scheduledDate,
-      estimatedHours: formData.estimatedHours
-        ? Number(formData.estimatedHours)
-        : 0,
-    };
-
-    setJobCards((prev) => [newJobCard, ...prev]);
-    toast.success(`Job card ${jobNumber} created`);
-    setShowModal(false);
-    setFormData({
-      title: "",
-      description: "",
-      jobType: "INSTALLATION",
-      priority: "MEDIUM",
-      customer: "",
-      vehicle: "",
-      technician: "",
-      scheduledDate: "",
-      estimatedHours: "",
-      location: "",
-    });
+  function openCreate() {
+    setEditingId(null);
+    setFormData(emptyForm);
+    setShowModal(true);
   }
+
+  function openEdit(job: JobCard) {
+    setEditingId(job.id);
+    setFormData({
+      title: job.title,
+      description: job.description ?? "",
+      job_type: job.job_type,
+      priority: job.priority,
+      status: job.status,
+      customer_id: job.customer_id ?? "",
+      scheduled_date: job.scheduled_date ?? "",
+      estimated_hours:
+        job.estimated_hours != null ? String(job.estimated_hours) : "",
+      location: job.location ?? "",
+      notes: job.notes ?? "",
+    });
+    setSelectedJob(null);
+    setShowModal(true);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const payload: JobCardInput = {
+      title: formData.title,
+      description: formData.description || null,
+      job_type: formData.job_type,
+      priority: formData.priority,
+      status: formData.status,
+      customer_id: formData.customer_id || null,
+      scheduled_date: formData.scheduled_date || null,
+      estimated_hours: formData.estimated_hours
+        ? Number(formData.estimated_hours)
+        : null,
+      location: formData.location || null,
+      notes: formData.notes || null,
+    };
+    try {
+      if (editingId) {
+        await updateJobCard.mutateAsync({ id: editingId, ...payload });
+      } else {
+        await createJobCard.mutateAsync(payload);
+      }
+      setShowModal(false);
+      setFormData(emptyForm);
+      setEditingId(null);
+    } catch {
+      // error toast handled in the hook
+    }
+  }
+
+  async function handleDelete(job: JobCard) {
+    if (
+      !window.confirm(
+        `Delete ${job.job_number}? This cannot be undone.`
+      )
+    )
+      return;
+    try {
+      await deleteJobCard.mutateAsync(job.id);
+      setSelectedJob(null);
+    } catch {
+      // handled in hook
+    }
+  }
+
+  const isSaving = createJobCard.isPending || updateJobCard.isPending;
 
   // -----------------------------------------------------------------------
   // Render
@@ -337,7 +345,7 @@ export default function JobCardsPage() {
             </p>
           </div>
           <button
-            onClick={() => setShowModal(true)}
+            onClick={openCreate}
             className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
           >
             <Plus className="h-4 w-4" />
@@ -347,63 +355,31 @@ export default function JobCardsPage() {
 
         {/* ---- Stats Row ---- */}
         <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Total Jobs */}
-          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50">
-                <Briefcase className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500">Total Jobs</p>
-                <p className="text-2xl font-bold text-gray-900">24</p>
-              </div>
-            </div>
-          </div>
-
-          {/* In Progress */}
-          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50">
-                <Clock className="h-5 w-5 text-amber-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500">In Progress</p>
-                <p className="text-2xl font-bold text-gray-900">8</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Completed This Month */}
-          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-50">
-                <CheckCircle2 className="h-5 w-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500">
-                  Completed This Month
-                </p>
-                <p className="text-2xl font-bold text-gray-900">12</p>
+          {stats.map((stat) => (
+            <div
+              key={stat.label}
+              className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className={cn(
+                    "flex h-10 w-10 items-center justify-center rounded-lg",
+                    stat.iconBg
+                  )}
+                >
+                  <stat.icon className={cn("h-5 w-5", stat.iconColor)} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">
+                    {stat.label}
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {isLoading ? "—" : stat.value}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-
-          {/* Revenue Generated */}
-          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50">
-                <DollarSign className="h-5 w-5 text-emerald-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500">
-                  Revenue Generated
-                </p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {formatCurrency(35400)}
-                </p>
-              </div>
-            </div>
-          </div>
+          ))}
         </div>
 
         {/* ---- Filter Bar ---- */}
@@ -491,175 +467,187 @@ export default function JobCardsPage() {
           </div>
         </div>
 
-        {/* ---- Job Cards Table ---- */}
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-600">
-                    Job Number
-                  </th>
-                  <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-600">
-                    Title
-                  </th>
-                  <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-600">
-                    Customer
-                  </th>
-                  <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-600">
-                    Technician
-                  </th>
-                  <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-600">
-                    Type
-                  </th>
-                  <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-600">
-                    Status
-                  </th>
-                  <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-600">
-                    Priority
-                  </th>
-                  <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-600">
-                    Scheduled Date
-                  </th>
-                  <th className="whitespace-nowrap px-4 py-3 text-center font-semibold text-gray-600">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filteredJobCards.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={9}
-                      className="px-4 py-12 text-center text-gray-400"
-                    >
-                      <Wrench className="mx-auto mb-3 h-8 w-8 text-gray-300" />
-                      <p className="text-sm font-medium">No job cards found</p>
-                      <p className="mt-1 text-xs">
-                        Try adjusting your filters or search query.
-                      </p>
-                    </td>
-                  </tr>
-                ) : (
-                  filteredJobCards.map((job) => (
-                    <tr
-                      key={job.id}
-                      className="transition-colors hover:bg-gray-50/70"
-                    >
-                      {/* Job Number */}
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <span
-                          className="cursor-pointer font-bold text-blue-600 hover:text-blue-800 hover:underline"
-                          onClick={() => setSelectedJob(job)}
-                        >
-                          {job.jobNumber}
-                        </span>
-                      </td>
-
-                      {/* Title */}
-                      <td className="max-w-[240px] truncate px-4 py-3 text-gray-800">
-                        {job.title}
-                      </td>
-
-                      {/* Customer */}
-                      <td className="whitespace-nowrap px-4 py-3 text-gray-700">
-                        {job.customer}
-                      </td>
-
-                      {/* Technician */}
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">
-                            {getInitials(job.technician)}
-                          </span>
-                          <span className="text-gray-700">
-                            {job.technician}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Type */}
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <span
-                          className={cn(
-                            "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-                            getJobTypeBadgeColor(job.jobType)
-                          )}
-                        >
-                          {formatLabel(job.jobType)}
-                        </span>
-                      </td>
-
-                      {/* Status */}
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <span
-                          className={cn(
-                            "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-                            getStatusColor(job.status)
-                          )}
-                        >
-                          {formatLabel(job.status)}
-                        </span>
-                      </td>
-
-                      {/* Priority */}
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <span
-                          className={cn(
-                            "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-                            getPriorityColor(job.priority)
-                          )}
-                        >
-                          {formatLabel(job.priority)}
-                        </span>
-                      </td>
-
-                      {/* Scheduled Date */}
-                      <td className="whitespace-nowrap px-4 py-3 text-gray-600">
-                        {formatDate(job.scheduledDate)}
-                      </td>
-
-                      {/* Actions */}
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <div className="flex items-center justify-center gap-1">
-                          <button
-                            title="View"
-                            onClick={() => setSelectedJob(job)}
-                            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-blue-600"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </button>
-                          <button
-                            title="Edit"
-                            onClick={() => toast.info(`Editing ${job.jobNumber} — coming soon`)}
-                            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-amber-600"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+        {/* ---- States / Job Cards Table ---- */}
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center rounded-xl border border-gray-200 bg-white py-16 shadow-sm">
+            <Loader2 className="mb-3 h-8 w-8 animate-spin text-blue-500" />
+            <p className="text-sm text-gray-500">Loading job cards…</p>
           </div>
-
-          {/* Table footer */}
-          <div className="border-t border-gray-200 bg-gray-50 px-4 py-3">
-            <p className="text-xs text-gray-500">
-              Showing{" "}
-              <span className="font-medium text-gray-700">
-                {filteredJobCards.length}
-              </span>{" "}
-              of{" "}
-              <span className="font-medium text-gray-700">
-                {jobCards.length}
-              </span>{" "}
-              job cards
+        ) : isError ? (
+          <div className="flex flex-col items-center justify-center rounded-xl border border-red-200 bg-red-50 py-16 shadow-sm">
+            <p className="text-lg font-medium text-red-700">
+              Failed to load job cards
+            </p>
+            <p className="mt-1 text-sm text-red-500">
+              {(error as Error)?.message ?? "Please try again."}
             </p>
           </div>
-        </div>
+        ) : (
+          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 bg-gray-50">
+                    <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-600">
+                      Job Number
+                    </th>
+                    <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-600">
+                      Title
+                    </th>
+                    <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-600">
+                      Customer
+                    </th>
+                    <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-600">
+                      Type
+                    </th>
+                    <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-600">
+                      Status
+                    </th>
+                    <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-600">
+                      Priority
+                    </th>
+                    <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-600">
+                      Scheduled Date
+                    </th>
+                    <th className="whitespace-nowrap px-4 py-3 text-center font-semibold text-gray-600">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredJobCards.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={8}
+                        className="px-4 py-12 text-center text-gray-400"
+                      >
+                        <Wrench className="mx-auto mb-3 h-8 w-8 text-gray-300" />
+                        <p className="text-sm font-medium">No job cards found</p>
+                        <p className="mt-1 text-xs">
+                          {jobCards.length === 0
+                            ? "Create your first job card to get started."
+                            : "Try adjusting your filters or search query."}
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredJobCards.map((job) => (
+                      <tr
+                        key={job.id}
+                        className="transition-colors hover:bg-gray-50/70"
+                      >
+                        {/* Job Number */}
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <span
+                            className="cursor-pointer font-bold text-blue-600 hover:text-blue-800 hover:underline"
+                            onClick={() => setSelectedJob(job)}
+                          >
+                            {job.job_number}
+                          </span>
+                        </td>
+
+                        {/* Title */}
+                        <td className="max-w-[240px] truncate px-4 py-3 text-gray-800">
+                          {job.title}
+                        </td>
+
+                        {/* Customer */}
+                        <td className="whitespace-nowrap px-4 py-3 text-gray-700">
+                          {customerName(job.customer_id)}
+                        </td>
+
+                        {/* Type */}
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <span
+                            className={cn(
+                              "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+                              getJobTypeBadgeColor(job.job_type)
+                            )}
+                          >
+                            {formatLabel(job.job_type)}
+                          </span>
+                        </td>
+
+                        {/* Status */}
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <span
+                            className={cn(
+                              "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+                              getStatusColor(job.status)
+                            )}
+                          >
+                            {formatLabel(job.status)}
+                          </span>
+                        </td>
+
+                        {/* Priority */}
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <span
+                            className={cn(
+                              "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+                              getPriorityColor(job.priority)
+                            )}
+                          >
+                            {formatLabel(job.priority)}
+                          </span>
+                        </td>
+
+                        {/* Scheduled Date */}
+                        <td className="whitespace-nowrap px-4 py-3 text-gray-600">
+                          {job.scheduled_date
+                            ? formatDate(job.scheduled_date)
+                            : "—"}
+                        </td>
+
+                        {/* Actions */}
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              title="View"
+                              onClick={() => setSelectedJob(job)}
+                              className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-blue-600"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </button>
+                            <button
+                              title="Edit"
+                              onClick={() => openEdit(job)}
+                              className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-amber-600"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button
+                              title="Delete"
+                              onClick={() => handleDelete(job)}
+                              className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Table footer */}
+            <div className="border-t border-gray-200 bg-gray-50 px-4 py-3">
+              <p className="text-xs text-gray-500">
+                Showing{" "}
+                <span className="font-medium text-gray-700">
+                  {filteredJobCards.length}
+                </span>{" "}
+                of{" "}
+                <span className="font-medium text-gray-700">
+                  {jobCards.length}
+                </span>{" "}
+                job cards
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ---- Detail Drawer ---- */}
@@ -677,7 +665,7 @@ export default function JobCardsPage() {
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
               <div>
                 <h2 className="text-lg font-bold text-gray-900">
-                  {selectedJob.jobNumber}
+                  {selectedJob.job_number}
                 </h2>
                 <p className="text-sm text-gray-500">{selectedJob.title}</p>
               </div>
@@ -719,10 +707,10 @@ export default function JobCardsPage() {
                   <span
                     className={cn(
                       "mt-1 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-                      getJobTypeBadgeColor(selectedJob.jobType)
+                      getJobTypeBadgeColor(selectedJob.job_type)
                     )}
                   >
-                    {formatLabel(selectedJob.jobType)}
+                    {formatLabel(selectedJob.job_type)}
                   </span>
                 </div>
                 <div>
@@ -730,7 +718,9 @@ export default function JobCardsPage() {
                     Scheduled Date
                   </p>
                   <p className="mt-1 text-sm font-medium text-gray-800">
-                    {formatDate(selectedJob.scheduledDate)}
+                    {selectedJob.scheduled_date
+                      ? formatDate(selectedJob.scheduled_date)
+                      : "—"}
                   </p>
                 </div>
               </div>
@@ -740,36 +730,89 @@ export default function JobCardsPage() {
               <div>
                 <p className="text-xs font-medium text-gray-500">Customer</p>
                 <p className="mt-1 text-sm font-medium text-gray-800">
-                  {selectedJob.customer}
+                  {customerName(selectedJob.customer_id)}
                 </p>
               </div>
 
-              <div>
-                <p className="text-xs font-medium text-gray-500">Technician</p>
-                <div className="mt-1 flex items-center gap-2">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">
-                    {getInitials(selectedJob.technician)}
-                  </span>
-                  <span className="text-sm font-medium text-gray-800">
-                    {selectedJob.technician}
-                  </span>
+              {selectedJob.technician_id && (
+                <div>
+                  <p className="text-xs font-medium text-gray-500">
+                    Technician
+                  </p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">
+                      {getInitials(selectedJob.technician_id)}
+                    </span>
+                    <span className="text-sm font-medium text-gray-800">
+                      {selectedJob.technician_id}
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {selectedJob.description && (
+                <div>
+                  <p className="text-xs font-medium text-gray-500">
+                    Description
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-gray-800">
+                    {selectedJob.description}
+                  </p>
+                </div>
+              )}
+
+              {selectedJob.location && (
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Location</p>
+                  <p className="mt-1 text-sm font-medium text-gray-800">
+                    {selectedJob.location}
+                  </p>
+                </div>
+              )}
 
               <div>
                 <p className="text-xs font-medium text-gray-500">
                   Estimated Hours
                 </p>
                 <p className="mt-1 text-sm font-medium text-gray-800">
-                  {selectedJob.estimatedHours}h
+                  {selectedJob.estimated_hours != null
+                    ? `${selectedJob.estimated_hours}h`
+                    : "—"}
                 </p>
               </div>
+
+              {selectedJob.notes && (
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Notes</p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-gray-800">
+                    {selectedJob.notes}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex gap-3 border-t border-gray-200 px-6 py-4">
+              <button
+                onClick={() => openEdit(selectedJob)}
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+              >
+                <Pencil className="h-4 w-4" />
+                Edit
+              </button>
+              <button
+                onClick={() => handleDelete(selectedJob)}
+                className="flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ---- New Job Card Modal ---- */}
+      {/* ---- New / Edit Job Card Modal ---- */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           {/* Backdrop */}
@@ -784,10 +827,12 @@ export default function JobCardsPage() {
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
               <div>
                 <h2 className="text-lg font-bold text-gray-900">
-                  New Job Card
+                  {editingId ? "Edit Job Card" : "New Job Card"}
                 </h2>
                 <p className="text-sm text-gray-500">
-                  Fill in the details to create a new job card.
+                  {editingId
+                    ? "Update the details of this job card."
+                    : "Fill in the details to create a new job card."}
                 </p>
               </div>
               <button
@@ -839,17 +884,17 @@ export default function JobCardsPage() {
                   </label>
                   <div className="relative">
                     <select
-                      name="jobType"
+                      name="job_type"
                       required
-                      value={formData.jobType}
+                      value={formData.job_type}
                       onChange={handleFormChange}
                       className="w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2 pr-9 text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     >
-                      <option value="INSTALLATION">Installation</option>
-                      <option value="MAINTENANCE">Maintenance</option>
-                      <option value="REPAIR">Repair</option>
-                      <option value="INSPECTION">Inspection</option>
-                      <option value="REMOVAL">Removal</option>
+                      {JOB_TYPE_VALUES.map((t) => (
+                        <option key={t} value={t}>
+                          {formatLabel(t)}
+                        </option>
+                      ))}
                     </select>
                     <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                   </div>
@@ -868,10 +913,11 @@ export default function JobCardsPage() {
                       onChange={handleFormChange}
                       className="w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2 pr-9 text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     >
-                      <option value="LOW">Low</option>
-                      <option value="MEDIUM">Medium</option>
-                      <option value="HIGH">High</option>
-                      <option value="URGENT">Urgent</option>
+                      {PRIORITY_VALUES.map((p) => (
+                        <option key={p} value={p}>
+                          {formatLabel(p)}
+                        </option>
+                      ))}
                     </select>
                     <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                   </div>
@@ -880,20 +926,19 @@ export default function JobCardsPage() {
                 {/* Customer */}
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                    Customer <span className="text-red-500">*</span>
+                    Customer
                   </label>
                   <div className="relative">
                     <select
-                      name="customer"
-                      required
-                      value={formData.customer}
+                      name="customer_id"
+                      value={formData.customer_id}
                       onChange={handleFormChange}
                       className="w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2 pr-9 text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     >
                       <option value="">Select customer</option>
-                      {CUSTOMERS.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
+                      {customers.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
                         </option>
                       ))}
                     </select>
@@ -901,46 +946,22 @@ export default function JobCardsPage() {
                   </div>
                 </div>
 
-                {/* Vehicle */}
+                {/* Status (edit only makes most sense, shown for both) */}
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                    Vehicle
+                    Status <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <select
-                      name="vehicle"
-                      value={formData.vehicle}
-                      onChange={handleFormChange}
-                      className="w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2 pr-9 text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    >
-                      <option value="">Select vehicle</option>
-                      {VEHICLES.map((v) => (
-                        <option key={v} value={v}>
-                          {v}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                  </div>
-                </div>
-
-                {/* Technician */}
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                    Technician <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <select
-                      name="technician"
+                      name="status"
                       required
-                      value={formData.technician}
+                      value={formData.status}
                       onChange={handleFormChange}
                       className="w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2 pr-9 text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     >
-                      <option value="">Select technician</option>
-                      {TECHNICIANS.map((t) => (
-                        <option key={t} value={t}>
-                          {t}
+                      {STATUS_VALUES.map((s) => (
+                        <option key={s} value={s}>
+                          {formatLabel(s)}
                         </option>
                       ))}
                     </select>
@@ -951,13 +972,12 @@ export default function JobCardsPage() {
                 {/* Scheduled Date */}
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                    Scheduled Date <span className="text-red-500">*</span>
+                    Scheduled Date
                   </label>
                   <input
                     type="date"
-                    name="scheduledDate"
-                    required
-                    value={formData.scheduledDate}
+                    name="scheduled_date"
+                    value={formData.scheduled_date}
                     onChange={handleFormChange}
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
@@ -970,10 +990,10 @@ export default function JobCardsPage() {
                   </label>
                   <input
                     type="number"
-                    name="estimatedHours"
+                    name="estimated_hours"
                     min="0"
                     step="0.5"
-                    value={formData.estimatedHours}
+                    value={formData.estimated_hours}
                     onChange={handleFormChange}
                     placeholder="e.g. 3"
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -994,6 +1014,23 @@ export default function JobCardsPage() {
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
+
+                {/* Notes - full width */}
+                <div className="sm:col-span-2">
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                    Notes
+                  </label>
+                  <textarea
+                    name="notes"
+                    rows={2}
+                    value={formData.notes}
+                    onChange={handleFormChange}
+                    placeholder="Additional notes..."
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* TODO: technician & vehicle pickers pending dedicated hooks */}
               </div>
 
               {/* Form Actions */}
@@ -1007,9 +1044,11 @@ export default function JobCardsPage() {
                 </button>
                 <button
                   type="submit"
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  disabled={isSaving}
+                  className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
                 >
-                  Create Job Card
+                  {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {editingId ? "Save Changes" : "Create Job Card"}
                 </button>
               </div>
             </form>
