@@ -98,6 +98,7 @@ inserts/updates to `never`.
 
 | Module | Status |
 | --- | --- |
+| Dashboard home | ✅ KPIs + charts derived from live data |
 | Customers | ✅ Wired to Supabase (full CRUD) |
 | Tasks | ✅ Wired (CRUD, derived KPIs) |
 | Job Cards | ✅ Wired (CRUD, derived stats) |
