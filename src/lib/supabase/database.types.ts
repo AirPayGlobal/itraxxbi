@@ -332,6 +332,8 @@ export type InspectionTypeEnum =
   | "REPAIR"
   | "UPGRADE_ADDON";
 
+export type InspectionStatus = "SUBMITTED" | "APPROVED" | "REJECTED";
+
 export type VehicleInspectionRow = Timestamps & {
   id: string;
   job_card_id: string | null;
@@ -377,6 +379,12 @@ export type VehicleInspectionRow = Timestamps & {
   signed_pre_check: boolean;
   signed_post_check: boolean;
   created_by_id: string | null;
+  status: InspectionStatus;
+  approved_by_id: string | null;
+  approved_at: string | null;
+  sent_to_client_at: string | null;
+  client_email: string | null;
+  review_note: string | null;
 };
 
 export type VehicleRow = Timestamps & {

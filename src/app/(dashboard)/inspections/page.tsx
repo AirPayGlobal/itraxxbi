@@ -11,16 +11,22 @@ import {
   Loader2,
   Car,
   Send,
+  Check,
+  XCircle,
 } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 import {
   useInspections,
   useCreateInspection,
+  useApproveInspection,
+  useRejectInspection,
   useDeleteInspection,
   type VehicleInspection,
   type VehicleInspectionInput,
 } from "@/lib/hooks/use-inspections";
 import { useCustomers } from "@/lib/hooks/use-customers";
+import { useAuth } from "@/components/providers/session-provider";
+import type { InspectionStatus } from "@/lib/supabase/database.types";
 import {
   INSPECTION_TYPES,
   CONDITION_ITEMS,
@@ -134,13 +140,67 @@ function typeLabel(t: string | null): string {
   return INSPECTION_TYPES.find((x) => x.value === t)?.label ?? "—";
 }
 
+const STATUS_STYLES: Record<InspectionStatus, string> = {
+  SUBMITTED: "bg-amber-100 text-amber-800",
+  APPROVED: "bg-green-100 text-green-800",
+  REJECTED: "bg-red-100 text-red-800",
+};
+
+function StatusBadge({ status }: { status: InspectionStatus }) {
+  const label =
+    status === "APPROVED"
+      ? "Approved · Sent"
+      : status.charAt(0) + status.slice(1).toLowerCase();
+  return (
+    <span
+      className={cn(
+        "inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium",
+        STATUS_STYLES[status]
+      )}
+    >
+      {label}
+    </span>
+  );
+}
+
 // --- Page --------------------------------------------------------------------
 
 export default function InspectionsPage() {
   const { data: inspections = [], isLoading, isError, error } = useInspections();
   const { data: customers = [] } = useCustomers();
+  const { profile } = useAuth();
   const createInspection = useCreateInspection();
+  const approveInspection = useApproveInspection();
+  const rejectInspection = useRejectInspection();
   const deleteInspection = useDeleteInspection();
+
+  // Who may approve & send to the client: Office Administrators, managers, admins.
+  const canReview =
+    profile?.role === "ADMIN" ||
+    profile?.role === "MANAGER" ||
+    (profile?.job_title ?? "").toLowerCase().includes("office admin");
+
+  async function handleApprove(i: VehicleInspection) {
+    let clientEmail: string | undefined;
+    if (!i.customer_id && !i.client_email) {
+      const entered = window.prompt(
+        "Client email to send this inspection to:"
+      );
+      if (!entered) return;
+      clientEmail = entered;
+    }
+    await approveInspection
+      .mutateAsync({ inspection: i, clientEmail })
+      .catch(() => {});
+  }
+
+  async function handleReject(i: VehicleInspection) {
+    const note = window.prompt("Reason for returning to the technician (optional):");
+    if (note === null) return;
+    await rejectInspection
+      .mutateAsync({ inspection: i, note: note || undefined })
+      .catch(() => {});
+  }
 
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -263,20 +323,21 @@ export default function InspectionsPage() {
                   <th className="px-4 py-3 font-semibold">Vehicle</th>
                   <th className="px-4 py-3 font-semibold">Type</th>
                   <th className="px-4 py-3 font-semibold">Technician</th>
+                  <th className="px-4 py-3 font-semibold">Status</th>
                   <th className="px-4 py-3 text-center font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-12 text-center text-gray-400">
+                    <td colSpan={8} className="px-4 py-12 text-center text-gray-400">
                       <Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin text-blue-500" />
                       <p className="text-sm">Loading inspections…</p>
                     </td>
                   </tr>
                 ) : isError ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-12 text-center text-red-500">
+                    <td colSpan={8} className="px-4 py-12 text-center text-red-500">
                       <p className="text-sm font-medium">
                         Failed to load inspections
                       </p>
@@ -287,7 +348,7 @@ export default function InspectionsPage() {
                   </tr>
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-12 text-center text-gray-400">
+                    <td colSpan={8} className="px-4 py-12 text-center text-gray-400">
                       <ClipboardCheck className="mx-auto mb-3 h-8 w-8 text-gray-300" />
                       <p className="text-sm font-medium">No inspections yet</p>
                       <p className="mt-1 text-xs">
@@ -323,7 +384,30 @@ export default function InspectionsPage() {
                         {i.technician_name || "—"}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
+                        <StatusBadge status={i.status} />
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3">
                         <div className="flex items-center justify-center gap-1">
+                          {canReview && i.status === "SUBMITTED" && (
+                            <>
+                              <button
+                                title="Approve & send to client"
+                                disabled={approveInspection.isPending}
+                                onClick={() => handleApprove(i)}
+                                className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-green-50 hover:text-green-600 disabled:opacity-50"
+                              >
+                                <Check className="h-4 w-4" />
+                              </button>
+                              <button
+                                title="Return to technician"
+                                disabled={rejectInspection.isPending}
+                                onClick={() => handleReject(i)}
+                                className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </button>
+                            </>
+                          )}
                           <button
                             title="View"
                             onClick={() => setViewing(i)}
@@ -745,9 +829,12 @@ function InspectionDetail({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-          <h2 className="text-lg font-bold text-slate-900">
-            Inspection — {i.reg_number || i.client_name || "Vehicle"}
-          </h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-bold text-slate-900">
+              Inspection — {i.reg_number || i.client_name || "Vehicle"}
+            </h2>
+            <StatusBadge status={i.status} />
+          </div>
           <button
             onClick={onClose}
             className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
@@ -843,6 +930,28 @@ function InspectionDetail({
                 i.signed_post_check ? "✓" : "✗"
               }`
             )}
+          </div>
+          <div className="border-t border-slate-100 pt-4">
+            <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-500">
+              Approval & Dispatch
+            </h3>
+            {row("Status", <StatusBadge status={i.status} />)}
+            {i.status === "APPROVED" && (
+              <>
+                {row(
+                  "Sent to client",
+                  i.client_email || "—"
+                )}
+                {row(
+                  "Sent at",
+                  i.sent_to_client_at
+                    ? formatDate(i.sent_to_client_at)
+                    : "—"
+                )}
+              </>
+            )}
+            {i.status === "REJECTED" &&
+              row("Reason", i.review_note || "—")}
           </div>
         </div>
       </div>
