@@ -94,13 +94,22 @@ Row types must be `type` aliases (not `interface`) — interfaces don't satisfy
 Supabase's `Record<string, unknown>` schema constraint and silently collapse
 inserts/updates to `never`.
 
-### Wiring status (core slice)
+### Wiring status
 
 | Module | Status |
 | --- | --- |
 | Customers | ✅ Wired to Supabase (full CRUD) |
-| Tasks, Job Cards, Invoices, Tickets | ⏳ Next (schema + hooks ready) |
-| All other modules | Mock/in-memory (prototype) |
+| Tasks | ✅ Wired (CRUD, derived KPIs) |
+| Job Cards | ✅ Wired (CRUD, derived stats) |
+| Finance / Invoices | ✅ Invoices wired (create w/ line items, send, pay, delete). Expenses/Reports still mock |
+| Tickets | ✅ Wired (tickets + comment thread) |
+| Projects | ✅ Wired (CRUD; tasks/Gantt derived from tasks table) |
+| Inventory | ✅ Wired (assets CRUD, low-stock alerts) |
+| HR, Staff, Payslips, My-Portal | ⏳ Mock — tables exist for HR (employees/leave); Payslips needs a table |
+| Documents | ⏳ Mock — needs Supabase Storage for real files |
+| Settings | ⏳ Mock — only the company logo persists (localStorage) |
+| Customer-Onboarding, Sales-Pipeline | ⏳ Mock — no backing tables yet |
+| TRAXX, Meeting-AI | Simulated by design (no LLM) |
 
 ## Database schema
 
