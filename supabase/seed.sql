@@ -1,6 +1,12 @@
--- Local-only seed for `supabase db reset`.
--- Creates 5 demo users in auth.users; the on_auth_user_created trigger
--- populates public.profiles automatically from raw_user_meta_data.
+-- LOCAL ONLY — runs via `supabase db reset` against the local dev stack.
+--
+-- DO NOT run this against a hosted/remote Supabase project. Inserting into
+-- auth.users with raw SQL leaves columns GoTrue depends on unset, which breaks
+-- login with "Database error querying schema" / a 500 "server configuration"
+-- page. For a remote project create the demo users with the Admin API instead:
+--   npm run seed:users   (see scripts/seed-remote-users.mjs)
+--
+-- The on_auth_user_created trigger populates public.profiles from metadata.
 
 insert into auth.users (
   id, instance_id, aud, role, email, encrypted_password,
