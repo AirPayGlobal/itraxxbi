@@ -530,7 +530,7 @@ function TicketDetail({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content — 2 cols */}
         <div className="col-span-2 space-y-6">
           {/* Description */}
@@ -881,7 +881,7 @@ export default function TicketsPage() {
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <StatCard
           label="Open Tickets"
           value={isLoading ? "—" : String(stats.open)}
@@ -1017,8 +1017,8 @@ export default function TicketsPage() {
         </div>
       ) : viewMode === "list" ? (
         /* List View */
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <table className="w-full">
+        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <table className="w-full min-w-[720px]">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-medium uppercase text-slate-500 dark:border-slate-800 dark:bg-slate-900/50">
                 <th className="px-5 py-3">Ticket</th>

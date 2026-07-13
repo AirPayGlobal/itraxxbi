@@ -866,8 +866,8 @@ function BillingTab() {
       {/* Invoice History */}
       <div>
         <h3 className="mb-3 text-sm font-semibold text-slate-700">Invoice History</h3>
-        <div className="overflow-hidden rounded-xl border border-slate-200">
-          <table className="w-full text-sm">
+        <div className="overflow-x-auto rounded-xl border border-slate-200">
+          <table className="w-full min-w-[560px] text-sm">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
                 <th className="px-4 py-3">Invoice</th>
@@ -1261,9 +1261,9 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <div className="flex flex-1 gap-0">
-        {/* Settings Sidebar */}
-        <nav className="w-56 shrink-0 border-r border-slate-200 bg-white p-3">
+      <div className="flex flex-1 flex-col gap-0 lg:flex-row">
+        {/* Settings Sidebar — horizontal scroll on mobile, vertical on desktop */}
+        <nav className="flex w-full shrink-0 gap-1 overflow-x-auto border-b border-slate-200 bg-white p-3 lg:w-56 lg:flex-col lg:overflow-visible lg:border-b-0 lg:border-r">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -1272,7 +1272,7 @@ export default function SettingsPage() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition",
+                  "flex w-auto shrink-0 items-center gap-3 whitespace-nowrap rounded-lg px-3 py-2.5 text-sm font-medium transition lg:w-full",
                   active
                     ? "bg-blue-50 text-blue-700"
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
@@ -1280,14 +1280,14 @@ export default function SettingsPage() {
               >
                 <Icon className={cn("h-4 w-4", active ? "text-blue-600" : "text-slate-400")} />
                 {tab.label}
-                {active && <ChevronRight className="ml-auto h-3.5 w-3.5 text-blue-400" />}
+                {active && <ChevronRight className="ml-auto hidden h-3.5 w-3.5 text-blue-400 lg:block" />}
               </button>
             );
           })}
         </nav>
 
         {/* Tab Content */}
-        <main className="flex-1 overflow-auto p-6">
+        <main className="flex-1 overflow-auto p-4 sm:p-6">
           <div className="mx-auto max-w-3xl">{tabContent[activeTab]}</div>
         </main>
       </div>

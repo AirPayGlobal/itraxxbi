@@ -104,14 +104,16 @@ export function Header({ onOpenCommand }: HeaderProps) {
   }, []);
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white px-6">
-      {/* Page Title */}
-      <div>
-        <h1 className="text-xl font-semibold text-slate-900">{pageTitle}</h1>
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white pl-16 pr-4 lg:px-6">
+      {/* Page Title (left padding on mobile clears the floating menu button) */}
+      <div className="min-w-0">
+        <h1 className="truncate text-lg font-semibold text-slate-900 lg:text-xl">
+          {pageTitle}
+        </h1>
       </div>
 
       {/* Right Section */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4">
         {/* Search / Command Palette trigger */}
         <button
           onClick={onOpenCommand}
@@ -140,7 +142,7 @@ export function Header({ onOpenCommand }: HeaderProps) {
           </button>
 
           {showNotifs && (
-            <div className="absolute right-0 top-full mt-1 w-80 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
+            <div className="absolute right-0 top-full mt-1 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
               <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5">
                 <p className="text-sm font-semibold text-slate-900">
                   Notifications

@@ -378,7 +378,7 @@ export default function CustomerOnboardingPage() {
         <h2 className="mb-4 text-sm font-semibold text-gray-700 uppercase tracking-wider">
           Pipeline Overview
         </h2>
-        <div className="grid grid-cols-7 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
           {stages.map((stage) => {
             const count = workflows.filter(
               (w) => w.currentStage === stage.key && w.status !== "COMPLETED" && w.status !== "CANCELLED"

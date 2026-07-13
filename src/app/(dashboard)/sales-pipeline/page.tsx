@@ -1296,7 +1296,7 @@ export default function SalesPipelinePage() {
               {/* Department Selection */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-3">Escalate to *</label>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {(["technical", "finance", "management"] as EscalationDept[]).map((dept) => (
                     <button
                       key={dept}
