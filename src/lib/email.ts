@@ -21,10 +21,12 @@ export async function sendEmail({
   htmlContent,
   senderEmail,
 }: SendEmailInput): Promise<void> {
-  const apiKey = process.env.TRANSACTMAIL_API_KEY;
+  // Accept either name: TRANSACTMAIL_API_KEY or EMAIL_SERVICE.
+  const apiKey =
+    process.env.TRANSACTMAIL_API_KEY ?? process.env.EMAIL_SERVICE;
   if (!apiKey) {
     throw new Error(
-      "Email is not configured (TRANSACTMAIL_API_KEY is not set)."
+      "Email is not configured (set TRANSACTMAIL_API_KEY or EMAIL_SERVICE)."
     );
   }
   const sender =
