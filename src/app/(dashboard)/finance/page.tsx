@@ -38,6 +38,7 @@ import {
   useInvoiceItems,
   useCreateInvoice,
   useUpdateInvoiceStatus,
+  useSendInvoice,
   useDeleteInvoice,
   type Invoice,
   type InvoiceInput,
@@ -135,6 +136,7 @@ export default function FinancePage() {
   const { data: customers = [] } = useCustomers();
   const createInvoice = useCreateInvoice();
   const updateStatus = useUpdateInvoiceStatus();
+  const sendInvoice = useSendInvoice();
   const deleteInvoice = useDeleteInvoice();
 
   const { data: expenses = [], isLoading: expensesLoading } = useExpenses();
@@ -296,7 +298,7 @@ export default function FinancePage() {
 
   async function handleSend(invoice: Invoice) {
     try {
-      await updateStatus.mutateAsync({ id: invoice.id, status: "SENT" });
+      await sendInvoice.mutateAsync(invoice.id);
     } catch {
       // handled in hook
     }
@@ -583,8 +585,8 @@ export default function FinancePage() {
                             {inv.status === "DRAFT" && (
                               <button
                                 className="rounded p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-green-600 disabled:opacity-50"
-                                title="Send"
-                                disabled={updateStatus.isPending}
+                                title="Email invoice to customer"
+                                disabled={sendInvoice.isPending}
                                 onClick={() => handleSend(inv)}
                               >
                                 <Send className="h-4 w-4" />

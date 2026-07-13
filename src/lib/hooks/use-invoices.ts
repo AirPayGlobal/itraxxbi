@@ -122,6 +122,28 @@ export function useCreateInvoice() {
   });
 }
 
+// Emails the invoice to the customer (server route) and marks it SENT.
+export function useSendInvoice() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string): Promise<{ email: string }> => {
+      const res = await fetch("/api/invoices/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invoiceId: id }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.error || "Failed to send invoice");
+      return { email: payload.email };
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: KEY });
+      toast.success(`Invoice emailed to ${data.email}`);
+    },
+    onError: (e: Error) => toast.error(e.message || "Failed to send invoice"),
+  });
+}
+
 export function useUpdateInvoiceStatus() {
   const qc = useQueryClient();
   return useMutation({
