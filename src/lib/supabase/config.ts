@@ -21,17 +21,33 @@
 const DEFAULT_URL = "https://xhmkchduceqpubqplzcg.supabase.co";
 const DEFAULT_KEY = "sb_publishable_PXepzY5a9a8FtB_c8uNl1A_AHpdwELh";
 
-const resolvedUrl =
-  process.env.NEXT_PUBLIC_SUPABASE_URL ??
-  process.env.SUPABASE_URL ??
-  "";
+// Strip whitespace and accidental wrapping quotes that hosts sometimes keep in
+// an env value (a common cause of "Invalid URL" build crashes).
+function clean(v: string | undefined): string {
+  return (v ?? "").trim().replace(/^['"]|['"]$/g, "").trim();
+}
+
+// A URL env value is only used if it actually parses as a URL; otherwise we
+// fall back to the working default so a malformed value can't break the build.
+function validUrl(v: string): string {
+  if (!v) return "";
+  try {
+    return new URL(v).toString().replace(/\/$/, "");
+  } catch {
+    return "";
+  }
+}
+
+const resolvedUrl = validUrl(
+  clean(process.env.NEXT_PUBLIC_SUPABASE_URL) ||
+    clean(process.env.SUPABASE_URL)
+);
 
 const resolvedKey =
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-  process.env.SUPABASE_PUBLISHABLE_KEY ??
-  process.env.SUPABASE_ANON_KEY ??
-  "";
+  clean(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) ||
+  clean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) ||
+  clean(process.env.SUPABASE_PUBLISHABLE_KEY) ||
+  clean(process.env.SUPABASE_ANON_KEY);
 
 export const isSupabaseConfigured = Boolean(resolvedUrl && resolvedKey);
 
