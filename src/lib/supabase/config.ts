@@ -12,8 +12,14 @@
 // runtime, where it is logged loudly). This keeps deploys from breaking purely
 // on a missing env var while still surfacing the misconfiguration.
 
-const PLACEHOLDER_URL = "https://placeholder.supabase.co";
-const PLACEHOLDER_KEY = "placeholder-anon-key";
+// Public project defaults. Both values are PUBLIC — the project URL is not a
+// secret and the "publishable" key is designed to be exposed in the browser
+// (RLS enforces access). Used as a final fallback so the client always
+// constructs with real, working values even if env vars are unset/misnamed on
+// the host — which also means the build can never fail on a missing var.
+// Override anytime via NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.
+const DEFAULT_URL = "https://xhmkchduceqpubqplzcg.supabase.co";
+const DEFAULT_KEY = "sb_publishable_PXepzY5a9a8FtB_c8uNl1A_AHpdwELh";
 
 const resolvedUrl =
   process.env.NEXT_PUBLIC_SUPABASE_URL ??
@@ -29,13 +35,5 @@ const resolvedKey =
 
 export const isSupabaseConfigured = Boolean(resolvedUrl && resolvedKey);
 
-if (!isSupabaseConfigured && typeof window !== "undefined") {
-  // Browser: real values are missing — the app cannot reach Supabase.
-  console.error(
-    "[Supabase] Missing config. Set NEXT_PUBLIC_SUPABASE_URL and " +
-      "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY in your environment."
-  );
-}
-
-export const SUPABASE_URL = resolvedUrl || PLACEHOLDER_URL;
-export const SUPABASE_ANON_KEY = resolvedKey || PLACEHOLDER_KEY;
+export const SUPABASE_URL = resolvedUrl || DEFAULT_URL;
+export const SUPABASE_ANON_KEY = resolvedKey || DEFAULT_KEY;
