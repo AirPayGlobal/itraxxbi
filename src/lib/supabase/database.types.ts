@@ -440,6 +440,7 @@ export type CompanySettingsRow = {
   vat_number: string | null;
   currency: string | null;
   timezone: string | null;
+  logo_url: string | null;
   updated_at: string;
 };
 

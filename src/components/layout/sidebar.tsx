@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/providers/session-provider";
+import { useCompanySettings } from "@/lib/hooks/use-company-settings";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { canAccessRoute } from "@/lib/role-access";
@@ -63,14 +63,8 @@ interface SidebarProps {
 export function Sidebar({ collapsed, onToggle, onOpenCommand }: SidebarProps) {
   const pathname = usePathname();
   const { profile } = useAuth();
-  const [customLogo, setCustomLogo] = useState<string | null>(null);
-
-  useEffect(() => {
-    setCustomLogo(localStorage.getItem("company-logo"));
-    const handler = () => setCustomLogo(localStorage.getItem("company-logo"));
-    window.addEventListener("company-logo-changed", handler);
-    return () => window.removeEventListener("company-logo-changed", handler);
-  }, []);
+  const { data: companySettings } = useCompanySettings();
+  const customLogo = companySettings?.logo_url ?? null;
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";

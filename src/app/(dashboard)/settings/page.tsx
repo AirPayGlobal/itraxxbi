@@ -31,6 +31,9 @@ import {
   useCompanySettings,
   useSaveCompanySettings,
 } from "@/lib/hooks/use-company-settings";
+import { useImageUpload } from "@/lib/hooks/use-image-upload";
+import { useAuth } from "@/components/providers/session-provider";
+import { createClient } from "@/lib/supabase/client";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -117,6 +120,8 @@ function SaveBar({ onSave }: { onSave: () => void }) {
 function CompanyTab() {
   const { data: settings } = useCompanySettings();
   const saveSettings = useSaveCompanySettings();
+  const { upload: uploadLogo, uploading: logoUploading } =
+    useImageUpload("logos");
 
   const [saved, setSaved] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
@@ -135,14 +140,10 @@ function CompanyTab() {
   const [currency, setCurrency] = useState("NAD");
   const [timezone, setTimezone] = useState("Africa/Windhoek");
 
-  useEffect(() => {
-    const stored = localStorage.getItem("company-logo");
-    if (stored) setLogoUrl(stored);
-  }, []);
-
   // Seed the form once the saved settings load.
   useEffect(() => {
     if (!settings) return;
+    setLogoUrl(settings.logo_url ?? null);
     setCompanyName(settings.company_name ?? "");
     setRegNumber(settings.reg_number ?? "");
     setIndustry(settings.industry ?? "fleet");
@@ -157,33 +158,25 @@ function CompanyTab() {
     setTimezone(settings.timezone ?? "Africa/Windhoek");
   }, [settings]);
 
-  const handleLogoUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      alert("File must be under 2 MB.");
-      return;
-    }
-    if (!file.type.startsWith("image/")) {
-      alert("Please upload an image file (PNG, JPG, SVG, etc.).");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      localStorage.setItem("company-logo", dataUrl);
-      setLogoUrl(dataUrl);
+  const handleLogoUpload = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const url = await uploadLogo(file, logoUrl);
+      if (!url) return;
+      setLogoUrl(url);
+      await saveSettings.mutateAsync({ logo_url: url });
       window.dispatchEvent(new Event("company-logo-changed"));
-    };
-    reader.readAsDataURL(file);
-  }, []);
+    },
+    [uploadLogo, logoUrl, saveSettings]
+  );
 
-  const handleRemoveLogo = useCallback(() => {
-    localStorage.removeItem("company-logo");
+  const handleRemoveLogo = useCallback(async () => {
     setLogoUrl(null);
+    await saveSettings.mutateAsync({ logo_url: null });
     window.dispatchEvent(new Event("company-logo-changed"));
     if (fileInputRef.current) fileInputRef.current.value = "";
-  }, []);
+  }, [saveSettings]);
 
   const handleSave = async () => {
     try {
@@ -239,10 +232,11 @@ function CompanyTab() {
           <div className="mt-2 flex items-center gap-2">
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition"
+              disabled={logoUploading}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
             >
               <Camera className="h-3.5 w-3.5" />
-              {logoUrl ? "Change Logo" : "Upload Logo"}
+              {logoUploading ? "Uploading…" : logoUrl ? "Change Logo" : "Upload Logo"}
             </button>
             {logoUrl && (
               <button
@@ -355,6 +349,10 @@ function CompanyTab() {
 // ---------------------------------------------------------------------------
 
 function AccountTab() {
+  const { user, profile, refresh } = useAuth();
+  const { upload: uploadAvatar, uploading: avatarUploading } =
+    useImageUpload("avatars");
+
   const [saved, setSaved] = useState(false);
   const [firstName, setFirstName] = useState("Admin");
   const [lastName, setLastName] = useState("User");
@@ -364,24 +362,40 @@ function AccountTab() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
-  const handleAvatarUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error("File must be under 2 MB.");
-      return;
+  // Seed from the signed-in profile.
+  useEffect(() => {
+    if (!profile) return;
+    setAvatarUrl(profile.avatar ?? null);
+    setEmail(user?.email ?? "");
+    if (profile.name) {
+      const [first, ...rest] = profile.name.split(" ");
+      setFirstName(first);
+      setLastName(rest.join(" "));
     }
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please upload an image file.");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      setAvatarUrl(reader.result as string);
+    if (profile.phone) setPhone(profile.phone);
+  }, [profile, user]);
+
+  const handleAvatarUpload = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file || !user) return;
+      const url = await uploadAvatar(file, avatarUrl);
+      if (!url) return;
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("profiles")
+        .update({ avatar: url })
+        .eq("id", user.id);
+      if (error) {
+        toast.error(error.message || "Could not save photo.");
+        return;
+      }
+      setAvatarUrl(url);
+      await refresh();
       toast.success("Profile photo updated.");
-    };
-    reader.readAsDataURL(file);
-  }, []);
+    },
+    [uploadAvatar, avatarUrl, user, refresh]
+  );
 
   const handleSave = () => {
     setSaved(true);
@@ -415,10 +429,11 @@ function AccountTab() {
           />
           <button
             onClick={() => avatarInputRef.current?.click()}
-            className="mt-1 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition"
+            disabled={avatarUploading}
+            className="mt-1 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
           >
             <Camera className="h-3.5 w-3.5" />
-            Change Photo
+            {avatarUploading ? "Uploading…" : "Change Photo"}
           </button>
         </div>
       </div>
