@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 130" fill="none">
+  <!-- Blue I bar -->
+  <rect x="0" y="18" width="6" height="72" rx="1" fill="#2196F3"/>
+
+  <!-- iTRACKER text — geometric/angular style -->
+  <g fill="#E2E8F0">
+    <!-- i -->
+    <rect x="14" y="18" width="6" height="72" rx="1"/>
+
+    <!-- T -->
+    <polygon points="32,18 72,18 72,26 56,26 56,90 48,90 48,26 32,26"/>
+
+    <!-- R -->
+    <path d="M80,18 L80,90 L88,90 L88,60 L100,60 L112,90 L121,90 L108,58 C114,55 118,48 118,40 C118,27 109,18 96,18 Z M88,26 L96,26 C104,26 110,31 110,40 C110,49 104,54 96,54 L88,54 Z"/>
+
+    <!-- A -->
+    <path d="M122,90 L148,18 L156,18 L182,90 L173,90 L166,70 L138,70 L131,90 Z M141,62 L163,62 L152,30 Z"/>
+
+    <!-- C -->
+    <path d="M208,18 C222,18 232,26 234,38 L226,38 C224,31 218,26 208,26 C196,26 188,36 188,54 C188,72 196,82 208,82 C218,82 224,77 226,70 L234,70 C232,82 222,90 208,90 C191,90 180,76 180,54 C180,32 191,18 208,18 Z"/>
+
+    <!-- K -->
+    <polygon points="242,18 242,90 250,90 250,58 278,90 289,90 258,54 286,18 276,18 250,50 250,18"/>
+
+    <!-- E -->
+    <polygon points="294,18 334,18 334,26 302,26 302,50 330,50 330,58 302,58 302,82 334,82 334,90 294,90"/>
+
+    <!-- R -->
+    <path d="M342,18 L342,90 L350,90 L350,60 L362,60 L374,90 L383,90 L370,58 C376,55 380,48 380,40 C380,27 371,18 358,18 Z M350,26 L358,26 C366,26 372,31 372,40 C372,49 366,54 358,54 L350,54 Z"/>
+  </g>
+
+  <!-- Blue X -->
+  <g fill="#2196F3">
+    <polygon points="388,90 400,58 388,26 397,26 406,50 415,26 424,26 412,58 424,90 415,90 406,66 397,90"/>
+  </g>
+
+  <!-- Signal arcs above X -->
+  <path d="M396,20 C403,6 417,6 424,20" stroke="#2196F3" stroke-width="5" stroke-linecap="round" fill="none"/>
+  <path d="M390,12 C400,-6 420,-6 430,12" stroke="#2196F3" stroke-width="5" stroke-linecap="round" fill="none"/>
+  <path d="M384,5 C397,-15 423,-15 436,5" stroke="#2196F3" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+
+  <!-- TM -->
+  <text x="430" y="12" font-family="Arial,sans-serif" font-size="9" font-weight="400" fill="#94A3B8">TM</text>
+
+  <!-- FLEET DATA INTELLIGENCE tagline -->
+  <text x="16" y="115" font-family="Arial,sans-serif" font-size="13" font-weight="500" letter-spacing="6" fill="#64748B">FLEET DATA INTELLIGENCE</text>
+</svg>

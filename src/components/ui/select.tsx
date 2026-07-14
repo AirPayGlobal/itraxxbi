@@ -3,8 +3,7 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-export interface SelectProps
-  extends React.SelectHTMLAttributes<HTMLSelectElement> {}
+export type SelectProps = React.SelectHTMLAttributes<HTMLSelectElement>;
 
 const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
   ({ className, children, ...props }, ref) => {
@@ -24,8 +23,8 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
 );
 Select.displayName = "Select";
 
-export interface SelectOptionProps
-  extends React.OptionHTMLAttributes<HTMLOptionElement> {}
+export type SelectOptionProps =
+  React.OptionHTMLAttributes<HTMLOptionElement>;
 
 const SelectOption = React.forwardRef<HTMLOptionElement, SelectOptionProps>(
   ({ className, ...props }, ref) => {

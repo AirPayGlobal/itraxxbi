@@ -266,7 +266,7 @@ function EmployeeDetailModal({
                 <Ticket className="h-4 w-4 text-blue-500" />
                 Ticket Performance Metrics
               </h3>
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
                   <p className="text-xs text-slate-500">Tickets Resolved</p>
                   <p className="mt-1 text-xl font-bold text-green-600">

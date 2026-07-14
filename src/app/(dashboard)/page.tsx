@@ -20,73 +20,32 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { motion } from "framer-motion";
-import { cn } from "@/lib/utils";
+import { useMemo } from "react";
+import { cn, formatDate } from "@/lib/utils";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
 import { StatsChart } from "@/components/dashboard/stats-chart";
+import { useJobCards } from "@/lib/hooks/use-job-cards";
+import { useTasks } from "@/lib/hooks/use-tasks";
+import { useCustomers } from "@/lib/hooks/use-customers";
+import { useInvoices } from "@/lib/hooks/use-invoices";
+import type { Priority } from "@/lib/supabase/database.types";
 
-// --- Mock data ---
+// --- Constants ---
 
-const jobCardsByStatus = [
-  { status: "Open", count: 8, fill: "#64748b" },
-  { status: "Assigned", count: 6, fill: "#8b5cf6" },
-  { status: "In Progress", count: 5, fill: "#3b82f6" },
-  { status: "Completed", count: 3, fill: "#22c55e" },
-  { status: "Invoiced", count: 2, fill: "#10b981" },
+const JOB_STATUS_CHART: { key: string; label: string; fill: string }[] = [
+  { key: "OPEN", label: "Open", fill: "#64748b" },
+  { key: "ASSIGNED", label: "Assigned", fill: "#8b5cf6" },
+  { key: "IN_PROGRESS", label: "In Progress", fill: "#3b82f6" },
+  { key: "COMPLETED", label: "Completed", fill: "#22c55e" },
+  { key: "INVOICED", label: "Invoiced", fill: "#10b981" },
 ];
 
-const revenueTrend = [
-  { month: "Aug", revenue: 32000 },
-  { month: "Sep", revenue: 35000 },
-  { month: "Oct", revenue: 38000 },
-  { month: "Nov", revenue: 42000 },
-  { month: "Dec", revenue: 45000 },
-  { month: "Jan", revenue: 48250 },
-];
-
-const upcomingTasks = [
-  {
-    id: "1",
-    title: "Complete brake inspection - JC-2601-0045",
-    dueDate: "Feb 22, 2026",
-    priority: "high" as const,
-  },
-  {
-    id: "2",
-    title: "Order replacement filters for Fleet B",
-    dueDate: "Feb 23, 2026",
-    priority: "medium" as const,
-  },
-  {
-    id: "3",
-    title: "Schedule quarterly maintenance review",
-    dueDate: "Feb 24, 2026",
-    priority: "low" as const,
-  },
-  {
-    id: "4",
-    title: "Submit monthly inventory report",
-    dueDate: "Feb 25, 2026",
-    priority: "medium" as const,
-  },
-  {
-    id: "5",
-    title: "Follow up with Apex Motors on invoice",
-    dueDate: "Feb 26, 2026",
-    priority: "high" as const,
-  },
-  {
-    id: "6",
-    title: "Calibrate diagnostic equipment",
-    dueDate: "Feb 27, 2026",
-    priority: "low" as const,
-  },
-];
-
-const priorityStyles: Record<string, string> = {
-  high: "bg-red-50 text-red-700",
-  medium: "bg-amber-50 text-amber-700",
-  low: "bg-slate-100 text-slate-600",
+const priorityStyles: Record<Priority, string> = {
+  URGENT: "bg-red-50 text-red-700",
+  HIGH: "bg-red-50 text-red-700",
+  MEDIUM: "bg-amber-50 text-amber-700",
+  LOW: "bg-slate-100 text-slate-600",
 };
 
 // --- Helpers ---
@@ -101,12 +60,74 @@ function formatCurrentDate(): string {
 }
 
 function formatRevenueTick(value: number): string {
-  return `$${(value / 1000).toFixed(0)}k`;
+  return `N$${(value / 1000).toFixed(0)}k`;
 }
 
 // --- Page ---
 
 export default function DashboardPage() {
+  const { data: jobCards = [] } = useJobCards();
+  const { data: tasks = [] } = useTasks();
+  const { data: customers = [] } = useCustomers();
+  const { data: invoices = [] } = useInvoices();
+
+  const activeJobCards = jobCards.filter(
+    (j) => !["COMPLETED", "INVOICED", "CANCELLED"].includes(j.status)
+  ).length;
+  const openTasks = tasks.filter(
+    (t) => !["DONE", "CANCELLED"].includes(t.status)
+  ).length;
+  const activeCustomers = customers.filter((c) => c.status === "ACTIVE").length;
+  const paidRevenue = invoices
+    .filter((i) => i.status === "PAID")
+    .reduce((sum, i) => sum + i.total, 0);
+
+  const jobCardsByStatus = useMemo(
+    () =>
+      JOB_STATUS_CHART.map((s) => ({
+        status: s.label,
+        count: jobCards.filter((j) => j.status === s.key).length,
+        fill: s.fill,
+      })),
+    [jobCards]
+  );
+
+  // Revenue trend: paid invoices grouped into the last 6 months.
+  const revenueTrend = useMemo(() => {
+    const now = new Date();
+    const months: { month: string; key: string; revenue: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({
+        month: d.toLocaleDateString("en-US", { month: "short" }),
+        key: `${d.getFullYear()}-${d.getMonth()}`,
+        revenue: 0,
+      });
+    }
+    const byKey = new Map(months.map((m) => [m.key, m]));
+    for (const inv of invoices) {
+      if (inv.status !== "PAID") continue;
+      const when = inv.paid_date ?? inv.issued_date ?? inv.created_at;
+      const d = new Date(when);
+      const bucket = byKey.get(`${d.getFullYear()}-${d.getMonth()}`);
+      if (bucket) bucket.revenue += inv.total;
+    }
+    return months;
+  }, [invoices]);
+
+  const upcomingTasks = useMemo(() => {
+    const now = new Date();
+    return tasks
+      .filter(
+        (t) =>
+          t.due_date != null &&
+          !["DONE", "CANCELLED"].includes(t.status) &&
+          new Date(t.due_date) >= new Date(now.toDateString())
+      )
+      .sort((a, b) => (a.due_date! < b.due_date! ? -1 : 1))
+      .slice(0, 6);
+  }, [tasks]);
+
   return (
     <div className="min-h-screen bg-slate-50 p-6 lg:p-8">
       {/* Welcome header */}
@@ -122,36 +143,37 @@ export default function DashboardPage() {
         <KpiCard
           index={0}
           title="Active Job Cards"
-          value="24"
-          change={12}
-          changeLabel="from last month"
+          value={String(activeJobCards)}
+          changeLabel="Open, assigned or in progress"
           icon={<Wrench className="h-5 w-5 text-blue-600" />}
           color="bg-blue-100"
         />
         <KpiCard
           index={1}
           title="Open Tasks"
-          value="47"
-          change={-5}
-          changeLabel="from last month"
+          value={String(openTasks)}
+          changeLabel="Not yet completed"
           icon={<CheckSquare className="h-5 w-5 text-purple-600" />}
           color="bg-purple-100"
         />
         <KpiCard
           index={2}
           title="Active Customers"
-          value="156"
-          change={8}
-          changeLabel="from last month"
+          value={String(activeCustomers)}
+          changeLabel="With status Active"
           icon={<Users className="h-5 w-5 text-emerald-600" />}
           color="bg-emerald-100"
         />
         <KpiCard
           index={3}
-          title="Monthly Revenue"
-          value="$48,250"
-          change={15}
-          changeLabel="from last month"
+          title="Revenue (Paid)"
+          value={new Intl.NumberFormat("en-NA", {
+            style: "currency",
+            currency: "NAD",
+            currencyDisplay: "narrowSymbol",
+            maximumFractionDigits: 0,
+          }).format(paidRevenue)}
+          changeLabel="Paid invoices to date"
           icon={<DollarSign className="h-5 w-5 text-amber-600" />}
           color="bg-amber-100"
         />
@@ -246,35 +268,41 @@ export default function DashboardPage() {
             </a>
           </div>
           <div className="divide-y divide-slate-100">
-            {upcomingTasks.map((task, i) => (
-              <motion.div
-                key={task.id}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.25, delay: 0.52 + i * 0.04 }}
-                className="flex items-center gap-3 px-6 py-3"
-              >
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100">
-                  <Clock className="h-3.5 w-3.5 text-slate-400" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm text-slate-700">
-                    {task.title}
-                  </p>
-                  <p className="mt-0.5 text-xs text-slate-400">
-                    Due: {task.dueDate}
-                  </p>
-                </div>
-                <span
-                  className={cn(
-                    "shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold capitalize",
-                    priorityStyles[task.priority]
-                  )}
+            {upcomingTasks.length === 0 ? (
+              <p className="px-6 py-8 text-center text-sm text-slate-400">
+                No upcoming tasks with due dates.
+              </p>
+            ) : (
+              upcomingTasks.map((task, i) => (
+                <motion.div
+                  key={task.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.25, delay: 0.52 + i * 0.04 }}
+                  className="flex items-center gap-3 px-6 py-3"
                 >
-                  {task.priority}
-                </span>
-              </motion.div>
-            ))}
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100">
+                    <Clock className="h-3.5 w-3.5 text-slate-400" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm text-slate-700">
+                      {task.title}
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-400">
+                      Due: {task.due_date ? formatDate(task.due_date) : "—"}
+                    </p>
+                  </div>
+                  <span
+                    className={cn(
+                      "shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold capitalize",
+                      priorityStyles[task.priority]
+                    )}
+                  >
+                    {task.priority.toLowerCase()}
+                  </span>
+                </motion.div>
+              ))
+            )}
           </div>
         </motion.div>
       </div>

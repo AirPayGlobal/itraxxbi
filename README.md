@@ -1,36 +1,151 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# iTraxx BI
 
-## Getting Started
+Next.js 16 + Supabase business intelligence platform.
 
-First, run the development server:
+## Stack
+
+- **Framework:** Next.js (App Router)
+- **Database & Auth:** Supabase (Postgres + Auth)
+- **Client:** `@supabase/supabase-js`, `@supabase/ssr` (cookie-based sessions for SSR + middleware)
+- **UI:** Tailwind v4, Radix primitives, Lucide, Sonner
+
+## Getting started
+
+### 1. Install dependencies
+
+```bash
+npm install
+```
+
+### 2. Configure environment
+
+Set these in your host (Vercel, etc.) or in a local `.env.local` (gitignored):
+
+| Variable | Value |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` **(required)** | `https://xhmkchduceqpubqplzcg.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` **(required)** | `sb_publishable_PXepzY5a9a8FtB_c8uNl1A_AHpdwELh` |
+| `DATABASE_URL` *(server-side migrations only)* | `postgresql://postgres:[YOUR-PASSWORD]@db.xhmkchduceqpubqplzcg.supabase.co:5432/postgres` |
+| `EMAIL_SERVICE` *(server-side only — secret)* | TransactMail API key. Powers outbound email (inspection reports, invoices). **Never** expose to the browser. (Also accepted: `TRANSACTMAIL_API_KEY`.) |
+| `TRANSACTMAIL_BASE_URL` *(optional)* | Defaults to `https://email-service.airpayglobal.com/v1` |
+| `TRANSACTMAIL_SENDER` *(optional)* | From-address for outbound email (must be authorised with the provider). Defaults to `no-reply@airpayglobal.com` |
+
+**Env var naming — important:**
+
+- The **browser** only receives variables prefixed with `NEXT_PUBLIC_`. The two
+  Supabase values above **must** use that prefix, or the client cannot reach
+  Supabase. Non-prefixed `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` are read as
+  a fallback in **server** code only (`src/lib/supabase/config.ts`).
+- Email is sent only from server code (`src/lib/email.ts`, used by the
+  `/api/inspections/send` and `/api/invoices/send` routes) so the key never
+  reaches the client. The key is read from `EMAIL_SERVICE` (or
+  `TRANSACTMAIL_API_KEY`).
+
+### 3. Link the Supabase project (one-time)
+
+```bash
+supabase login
+supabase link --project-ref xhmkchduceqpubqplzcg
+```
+
+### 4. Apply the schema
+
+To push the migration in `supabase/migrations/` to the linked remote project:
+
+```bash
+npm run db:push        # supabase db push
+```
+
+To reset the **local** dev database (when running `supabase start`) and re-run migrations + seed:
+
+```bash
+npm run db:reset       # supabase db reset
+```
+
+### 5. Run the dev server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open <http://localhost:3000>.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Auth flows
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+All authentication runs through Supabase Auth — there is no NextAuth and no Prisma.
 
-## Learn More
+| Flow | File | API |
+| --- | --- | --- |
+| Sign in | `src/app/login/page.tsx` | `supabase.auth.signInWithPassword` |
+| Sign up | `src/app/register/page.tsx` | `supabase.auth.signUp` (user metadata mapped to `profiles` via trigger) |
+| Forgot password | `src/app/forgot-password/page.tsx` | `supabase.auth.resetPasswordForEmail` |
+| Reset password | `src/app/reset-password/page.tsx` | `supabase.auth.updateUser` on the recovery session |
+| Sign out | header dropdown | `supabase.auth.signOut` |
+| Route guard | `src/middleware.ts` + `src/lib/supabase/middleware.ts` | refreshes session cookies, redirects unauthenticated users to `/login` |
 
-To learn more about Next.js, take a look at the following resources:
+Client-side state is exposed via the `useAuth()` hook in `src/components/providers/session-provider.tsx`, which returns `{ user, session, profile, loading, signOut, refresh }`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Data layer
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Feature pages read and write real data through Supabase using TanStack Query hooks
+in `src/lib/hooks/`. The pattern (see `use-customers.ts` as the reference):
 
-## Deploy on Vercel
+- `useX()` — `useQuery` selecting from the table
+- `useCreateX()` / `useUpdateX()` / `useDeleteX()` — `useMutation` calling Supabase,
+  invalidating the query, and surfacing a toast
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+`QueryProvider` (`src/components/providers/query-provider.tsx`) wraps the app.
+The browser client is typed with `Database` from `src/lib/supabase/database.types.ts`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**Types:** `database.types.ts` is currently hand-written for the wired ("core slice")
+tables. Once the project is linked, regenerate the full, always-correct set with:
+
+```bash
+supabase gen types typescript --linked > src/lib/supabase/database.types.ts
+```
+
+Row types must be `type` aliases (not `interface`) — interfaces don't satisfy
+Supabase's `Record<string, unknown>` schema constraint and silently collapse
+inserts/updates to `never`.
+
+### Wiring status
+
+| Module | Status |
+| --- | --- |
+| Dashboard home | ✅ KPIs + charts derived from live data |
+| Customers | ✅ Wired to Supabase (full CRUD) |
+| Tasks | ✅ Wired (CRUD, derived KPIs) |
+| Job Cards | ✅ Wired (CRUD, derived stats) |
+| Finance | ✅ Invoices + Expenses wired (CRUD, approve). Reports charts still mock |
+| Tickets | ✅ Wired (tickets + comment thread) |
+| Projects | ✅ Wired (CRUD; tasks/Gantt derived from tasks table) |
+| Inventory | ✅ Wired (assets CRUD, low-stock alerts) |
+| HR | ✅ Wired (leave requests + employee directory, linked to profiles) |
+| Staff, Payslips, My-Portal | ⏳ Mock — Payslips needs a table |
+| Documents | ✅ Wired — upload to a **private** Storage bucket, served via signed URLs |
+| Settings | ⏳ Mock — only the company logo persists (localStorage) |
+| Customer-Onboarding, Sales-Pipeline | ⏳ Mock — no backing tables yet |
+| TRAXX, Meeting-AI | Simulated by design (no LLM) |
+
+## Database schema
+
+The full schema lives in `supabase/migrations/20260521000000_initial_schema.sql`. Key tables:
+
+- `profiles` — 1:1 with `auth.users` (id, name, role, department, etc.). Auto-populated by the `on_auth_user_created` trigger from `auth.users.raw_user_meta_data`.
+- Domain tables (`projects`, `tasks`, `customers`, `vehicles`, `job_cards`, `assets`, `invoices`, `employees`, `leave_requests`, `documents`, …) reference `profiles.id` instead of a Prisma `User` table.
+
+Row Level Security is enabled on every table with a permissive `authenticated`-only default. Tighten policies in a follow-up migration as access rules solidify.
+
+## Seed users (local only)
+
+`supabase/seed.sql` provisions five demo users when you `supabase db reset`:
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Admin | `admin@itrackerx.com` | `admin123` |
+| Manager | `manager@itrackerx.com` | `manager123` |
+| Technician | `technician@itrackerx.com` | `tech123` |
+| Staff | `staff@itrackerx.com` | `staff123` |
+| Viewer | `viewer@itrackerx.com` | `viewer123` |
+
+For the **remote** Supabase project, create demo users via the dashboard or `supabase.auth.admin.createUser` — `seed.sql` only runs against local.
