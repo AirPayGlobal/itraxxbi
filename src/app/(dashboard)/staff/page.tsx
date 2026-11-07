@@ -475,7 +475,7 @@ export default function StaffPerformancePage() {
         s.overallScore >= 90
           ? "#22c55e"
           : s.overallScore >= 80
-            ? "#3b82f6"
+            ? "#1e8fe0"
             : s.overallScore >= 70
               ? "#f59e0b"
               : "#ef4444",
@@ -861,7 +861,7 @@ export default function StaffPerformancePage() {
                 <Bar
                   dataKey="replies"
                   name="Replies"
-                  fill="#3b82f6"
+                  fill="#1e8fe0"
                   radius={[4, 4, 0, 0]}
                 />
                 <Bar

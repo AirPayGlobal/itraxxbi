@@ -1,15 +1,54 @@
 @import "tailwindcss";
 
+/*
+ * iTrackerX design tokens, taken from the logo:
+ *   brand  – the azure "I" (500) running from the deep blue of the X (700) to its sky-blue signal arcs (300)
+ *   ink    – the charcoal of the "TRACKER" wordmark
+ *   signal – the X's gradient, for accents that should read as "the logo"
+ * Tailwind's blue scale is mapped onto brand so every existing blue-* utility follows the logo.
+ */
+@theme {
+  --color-brand-50: #eef7fe;
+  --color-brand-100: #d9edfc;
+  --color-brand-200: #b4dbf8;
+  --color-brand-300: #7fc3f3;
+  --color-brand-400: #45a7eb;
+  --color-brand-500: #1e8fe0;
+  --color-brand-600: #1676c4;
+  --color-brand-700: #145fa3;
+  --color-brand-800: #154f84;
+  --color-brand-900: #16426b;
+  --color-brand-950: #0e2945;
+
+  --color-blue-50: var(--color-brand-50);
+  --color-blue-100: var(--color-brand-100);
+  --color-blue-200: var(--color-brand-200);
+  --color-blue-300: var(--color-brand-300);
+  --color-blue-400: var(--color-brand-400);
+  --color-blue-500: var(--color-brand-500);
+  --color-blue-600: var(--color-brand-600);
+  --color-blue-700: var(--color-brand-700);
+  --color-blue-800: var(--color-brand-800);
+  --color-blue-900: var(--color-brand-900);
+  --color-blue-950: var(--color-brand-950);
+
+  --color-ink-500: #5a616b;
+  --color-ink-600: #3d434c;
+  --color-ink-700: #2e333b;
+  --color-ink-800: #23272e;
+  --color-ink-900: #1c2026;
+  --color-ink-950: #15181d;
+
+  --font-display: var(--font-montserrat), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
 :root {
-  /* Brand Colors */
-  --brand-primary: #2563eb;
-  --brand-primary-dark: #1d4ed8;
-  --brand-primary-light: #3b82f6;
-  --brand-accent: #60a5fa;
+  --brand-primary: var(--color-brand-600);
+  --signal-gradient: linear-gradient(135deg, var(--color-brand-700) 0%, var(--color-brand-500) 55%, var(--color-brand-300) 100%);
 
   /* Neutral */
   --background: #f8fafc;
-  --foreground: #0f172a;
+  --foreground: var(--color-ink-800);
   --surface: #ffffff;
   --border: #e2e8f0;
 
@@ -17,13 +56,35 @@
   --success: #16a34a;
   --warning: #d97706;
   --danger: #dc2626;
-  --info: #2563eb;
+  --info: var(--color-brand-600);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* The logo's gradient, for brand accents (active nav, hero panels). */
+@utility bg-signal {
+  background-image: var(--signal-gradient);
+}
+
+/* The tagline's spaced capitals ("FLEET DATA INTELLIGENCE"), for small section labels. */
+@utility eyebrow {
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+/* Page and section headings use the geometric display face, echoing the wordmark. */
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
 }
 
 /* Base Body Styles */

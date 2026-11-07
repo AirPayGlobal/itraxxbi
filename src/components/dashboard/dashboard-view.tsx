@@ -51,7 +51,8 @@ export function DashboardView({ data, userName }: { data: DashboardData; userNam
   return (
     <div className="min-h-screen bg-slate-50 p-6 lg:p-8">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-900">Welcome back, {userName}</h1>
+        <p className="eyebrow text-brand-600">Fleet Data Intelligence</p>
+        <h1 className="mt-1 text-2xl font-bold text-ink-800">Welcome back, {userName}</h1>
         <p className="mt-1 text-sm text-slate-500" suppressHydrationWarning>
           {formatCurrentDate()}
         </p>
@@ -147,9 +148,9 @@ export function DashboardView({ data, userName }: { data: DashboardData; userNam
               <Line
                 type="monotone"
                 dataKey="revenue"
-                stroke="#3b82f6"
+                stroke="#1e8fe0"
                 strokeWidth={2}
-                dot={{ fill: "#3b82f6", r: 4 }}
+                dot={{ fill: "#1e8fe0", r: 4 }}
                 activeDot={{ r: 6 }}
               />
             </LineChart>

@@ -23,7 +23,7 @@ export interface DashboardData {
 const STATUS_BARS: { status: JobStatus; label: string; fill: string }[] = [
   { status: "OPEN", label: "Open", fill: "#64748b" },
   { status: "ASSIGNED", label: "Assigned", fill: "#8b5cf6" },
-  { status: "IN_PROGRESS", label: "In Progress", fill: "#3b82f6" },
+  { status: "IN_PROGRESS", label: "In Progress", fill: "#1e8fe0" },
   { status: "COMPLETED", label: "Completed", fill: "#22c55e" },
   { status: "INVOICED", label: "Invoiced", fill: "#10b981" },
 ];

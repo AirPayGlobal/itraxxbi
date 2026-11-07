@@ -22,6 +22,7 @@ export async function proxy(req: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!login|register|forgot-password|reset-password|api/auth|_next|favicon\\.ico|logo\\.svg).*)",
+    // Skip auth pages, Next internals and any static file (paths with an extension, e.g. /logo-dark.svg).
+    "/((?!login|register|forgot-password|reset-password|api/auth|_next|.*\\.[a-zA-Z0-9]+$).*)",
   ],
 };

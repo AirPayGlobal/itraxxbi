@@ -75,12 +75,12 @@ export function Sidebar({ collapsed, onToggle, onOpenCommand }: SidebarProps) {
     return pathname.startsWith(href);
   };
 
-  const logoSrc = customLogo || "/logo.svg";
+  const logoSrc = customLogo || "/logo-wordmark.svg";
 
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 z-40 flex h-screen flex-col bg-slate-900 text-white transition-all duration-300",
+        "fixed left-0 top-0 z-40 flex h-screen flex-col bg-ink-900 text-white transition-all duration-300",
         collapsed ? "w-16" : "w-64"
       )}
     >
@@ -91,13 +91,13 @@ export function Sidebar({ collapsed, onToggle, onOpenCommand }: SidebarProps) {
             customLogo ? (
               <img src={customLogo} alt="Logo" className="h-9 w-9 flex-shrink-0 object-contain" />
             ) : (
-              <img src="/logo.svg" alt="iTrackerX" className="h-8 w-auto flex-shrink-0" />
+              <img src="/logo-icon.svg" alt="iTrackerX" className="h-9 w-9 flex-shrink-0" />
             )
           ) : (
             <img
               src={logoSrc}
               alt="iTrackerX — Fleet Data Intelligence"
-              className="h-10 w-auto flex-shrink-0"
+              className="h-11 w-auto flex-shrink-0"
             />
           )}
         </Link>
@@ -108,11 +108,11 @@ export function Sidebar({ collapsed, onToggle, onOpenCommand }: SidebarProps) {
         <div className="px-3 py-3">
           <button
             onClick={onOpenCommand}
-            className="flex w-full items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-400 transition-colors hover:border-slate-600 hover:text-slate-300"
+            className="flex w-full items-center gap-2 rounded-lg border border-ink-700 bg-ink-800 px-3 py-2 text-xs text-slate-400 transition-colors hover:border-ink-600 hover:text-slate-300"
           >
             <Search className="h-3.5 w-3.5" />
             <span className="flex-1 text-left">Quick search...</span>
-            <kbd className="rounded border border-slate-700 bg-slate-900 px-1.5 py-0.5 text-[10px]">
+            <kbd className="rounded border border-ink-700 bg-ink-900 px-1.5 py-0.5 text-[10px]">
               ⌘K
             </kbd>
           </button>
@@ -133,7 +133,7 @@ export function Sidebar({ collapsed, onToggle, onOpenCommand }: SidebarProps) {
                 "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                 active
                   ? "text-white"
-                  : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                  : "text-slate-400 hover:bg-ink-800 hover:text-white"
               )}
               title={collapsed ? item.label : undefined}
             >
@@ -141,7 +141,7 @@ export function Sidebar({ collapsed, onToggle, onOpenCommand }: SidebarProps) {
               {active && (
                 <motion.div
                   layoutId="activeNavItem"
-                  className="absolute inset-0 rounded-lg bg-blue-600"
+                  className="absolute inset-0 rounded-lg bg-linear-to-r from-brand-700 to-brand-500 shadow-sm shadow-brand-950/40"
                   transition={{ type: "spring", bounce: 0.15, duration: 0.4 }}
                 />
               )}
@@ -161,10 +161,10 @@ export function Sidebar({ collapsed, onToggle, onOpenCommand }: SidebarProps) {
       </nav>
 
       {/* Collapse Toggle */}
-      <div className="border-t border-slate-700/60 p-2">
+      <div className="border-t border-ink-700 p-2">
         <button
           onClick={onToggle}
-          className="flex w-full items-center justify-center rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
+          className="flex w-full items-center justify-center rounded-lg p-2 text-slate-400 transition-colors hover:bg-ink-800 hover:text-white"
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {collapsed ? (

@@ -8,24 +8,46 @@ interface AuthLayoutProps {
   subtitle: string;
 }
 
+function SignalArcs({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 400 400" fill="none" aria-hidden="true" className={className}>
+      <defs>
+        <linearGradient id="auth-arcs" x1="0" y1="400" x2="400" y2="0" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="var(--color-brand-700)" />
+          <stop offset="1" stopColor="var(--color-brand-300)" />
+        </linearGradient>
+      </defs>
+      <g stroke="url(#auth-arcs)" strokeLinecap="round">
+        <path d="M0 300a100 100 0 0 1 100 100" strokeWidth="22" />
+        <path d="M0 200a200 200 0 0 1 200 200" strokeWidth="22" />
+        <path d="M0 100a300 300 0 0 1 300 300" strokeWidth="22" />
+        <path d="M0 0a400 400 0 0 1 400 400" strokeWidth="22" />
+      </g>
+    </svg>
+  );
+}
+
 export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
   return (
     <div className="flex min-h-screen">
       {/* Left panel - branding */}
-      <div className="hidden w-1/2 flex-col justify-between bg-slate-900 p-12 lg:flex">
-        <Link href="/login" className="flex items-center">
-          <img src="/logo.svg" alt="iTrackerX" className="h-10 w-auto brightness-0 invert" />
+      <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-ink-900 p-12 lg:flex">
+        <SignalArcs className="pointer-events-none absolute -right-24 -top-24 h-[520px] w-[520px] rotate-90 opacity-[0.14]" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1 bg-signal" />
+
+        <Link href="/login" className="relative flex items-center">
+          <img src="/logo-dark.svg" alt="iTrackerX — Fleet Data Intelligence" className="h-14 w-auto" />
         </Link>
-        <div>
-          <h2 className="text-3xl font-bold text-white">
-            Fleet Data Intelligence
+        <div className="relative max-w-md">
+          <p className="eyebrow text-brand-300">Fleet Data Intelligence</p>
+          <h2 className="mt-4 text-3xl font-bold leading-tight text-white">
+            Every vehicle, job and customer in one view.
           </h2>
           <p className="mt-3 text-base text-slate-400">
-            Comprehensive business intelligence for vehicle tracking and fleet
-            management operations.
+            Business intelligence for vehicle tracking and fleet management operations.
           </p>
         </div>
-        <p className="text-xs text-slate-500">
+        <p className="relative text-xs text-slate-500">
           &copy; {new Date().getFullYear()} iTrackerX. All rights reserved.
         </p>
       </div>
@@ -35,11 +57,11 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
         <div className="w-full max-w-md">
           {/* Mobile logo */}
           <div className="mb-8 flex justify-center lg:hidden">
-            <img src="/logo.svg" alt="iTrackerX" className="h-10 w-auto" />
+            <img src="/logo.svg" alt="iTrackerX — Fleet Data Intelligence" className="h-12 w-auto" />
           </div>
 
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
+            <h1 className="text-2xl font-bold text-ink-800">{title}</h1>
             <p className="mt-2 text-sm text-slate-500">{subtitle}</p>
           </div>
 

@@ -1020,7 +1020,7 @@ export function TicketsBoard({ initialTickets, customers, vehicles, agents }: Ti
                   className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50"
                   onClick={() => setSelectedTicket(ticket)}
                 >
-                  <td className="px-5 py-3.5">
+                  <td className="whitespace-nowrap px-5 py-3.5">
                     <span className="font-mono text-xs font-medium text-blue-600 dark:text-blue-400">
                       {ticket.ticketNumber}
                     </span>

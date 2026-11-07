@@ -197,7 +197,7 @@ const revenueByMonth = [
 
 const invoiceStatusBreakdown = [
   { name: "Paid", value: 3, color: "#22c55e" },
-  { name: "Sent", value: 2, color: "#3b82f6" },
+  { name: "Sent", value: 2, color: "#1e8fe0" },
   { name: "Draft", value: 1, color: "#94a3b8" },
   { name: "Overdue", value: 1, color: "#ef4444" },
   { name: "Partial", value: 1, color: "#f59e0b" },
@@ -692,7 +692,7 @@ export default function FinancePage() {
                       boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
                     }}
                   />
-                  <Bar dataKey="revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Revenue" />
+                  <Bar dataKey="revenue" fill="#1e8fe0" radius={[4, 4, 0, 0]} name="Revenue" />
                   <Bar dataKey="expenses" fill="#f87171" radius={[4, 4, 0, 0]} name="Expenses" />
                 </BarChart>
               </ResponsiveContainer>

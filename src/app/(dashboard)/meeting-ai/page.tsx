@@ -287,7 +287,7 @@ function AudioVisualizer({ isActive, isPaused }: { isActive: boolean; isPaused: 
 
         const gradient = ctx.createLinearGradient(x, y, x, y + h);
         if (isActive && !isPaused) {
-          gradient.addColorStop(0, "#3b82f6");
+          gradient.addColorStop(0, "#1e8fe0");
           gradient.addColorStop(0.5, "#6366f1");
           gradient.addColorStop(1, "#8b5cf6");
         } else {
