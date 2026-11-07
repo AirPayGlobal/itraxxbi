@@ -69,6 +69,7 @@ enum UserRole {
 
 model Task {
   id          String     @id @default(cuid())
+  number      Int        @unique @default(autoincrement())
   title       String
   description String?
   status      TaskStatus @default(TODO)

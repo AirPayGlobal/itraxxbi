@@ -210,6 +210,55 @@ async function seedBusinessData() {
   console.log(`Seeded ${customers.length} customers, ${jobCards.length} job cards, ${tasks.length} tasks, ${n - 1} paid invoices`);
 }
 
+const projectNames = ["Fleet Tracker Rollout", "Fleet Maintenance", "Vehicle Diagnostics", "Client Onboarding"];
+
+async function seedProjects() {
+  if ((await prisma.project.count()) > 0) return;
+  const projects = [];
+  for (const name of projectNames) projects.push(await prisma.project.create({ data: { name, status: "ACTIVE" } }));
+  const tasks = await prisma.task.findMany({ where: { projectId: null }, select: { id: true }, orderBy: { createdAt: "asc" } });
+  for (const [i, t] of tasks.entries()) {
+    await prisma.task.update({ where: { id: t.id }, data: { projectId: projects[i % projects.length].id } });
+  }
+  console.log(`Seeded ${projects.length} projects`);
+}
+
+const vehicleModels = [
+  ["Toyota", "Hilux"], ["Ford", "Ranger"], ["Isuzu", "D-Max"], ["Toyota", "Land Cruiser"], ["Nissan", "NP300"], ["Mercedes-Benz", "Actros"],
+] as const;
+
+async function seedVehicles() {
+  if ((await prisma.vehicle.count()) > 0) return;
+  const owners = await prisma.customer.findMany({ where: { status: "ACTIVE" }, select: { id: true }, orderBy: { accountNumber: "asc" } });
+  let n = 0;
+  for (const owner of owners) {
+    for (let k = 0; k < 2; k++, n++) {
+      const [make, model] = vehicleModels[n % vehicleModels.length];
+      await prisma.vehicle.create({
+        data: {
+          make,
+          model,
+          year: 2018 + (n % 7),
+          registrationNumber: `N ${1200 + n * 37} WB`,
+          trackerStatus: "ACTIVE",
+          customerId: owner.id,
+        },
+      });
+    }
+  }
+  console.log(`Seeded ${n} vehicles`);
+}
+
+async function linkInvoicesToJobCards() {
+  if ((await prisma.invoice.count({ where: { jobCardId: { not: null } } })) > 0) return;
+  const jobs = await prisma.jobCard.findMany({ where: { status: "INVOICED" }, select: { id: true, customerId: true } });
+  const invoices = await prisma.invoice.findMany({ where: { jobCardId: null, status: "PAID" }, select: { id: true }, orderBy: { paidDate: "desc" }, take: jobs.length });
+  for (const [i, inv] of invoices.entries()) {
+    await prisma.invoice.update({ where: { id: inv.id }, data: { jobCardId: jobs[i].id, customerId: jobs[i].customerId ?? undefined } });
+  }
+  if (invoices.length) console.log(`Linked ${invoices.length} invoices to job cards`);
+}
+
 async function main() {
   for (const user of demoUsers) {
     const hashedPassword = await bcrypt.hash(user.password, 12);
@@ -221,6 +270,9 @@ async function main() {
   }
   console.log("Seed complete: 5 demo users created");
   await seedBusinessData();
+  await seedProjects();
+  await seedVehicles();
+  await linkInvoicesToJobCards();
 }
 
 main()
