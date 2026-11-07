@@ -1,0 +1,716 @@
+"use client";
+
+import { useState, useMemo } from "react";
+import { toast } from "sonner";
+import {
+  Users,
+  FileText,
+  Car,
+  DollarSign,
+  Plus,
+  Search,
+  Mail,
+  Phone,
+  MapPin,
+  Calendar,
+  X,
+  Building2,
+  ClipboardList,
+  ChevronRight,
+  Pencil,
+} from "lucide-react";
+import Link from "next/link";
+import { cn, getStatusColor, formatCurrency } from "@/lib/utils";
+import { formatDay } from "@/lib/format";
+import type { CustomerRow } from "@/lib/customers";
+import { saveCustomer } from "./actions";
+
+type Customer = CustomerRow;
+
+const EMPTY_FORM = {
+  name: "",
+  company: "",
+  email: "",
+  phone: "",
+  address: "",
+  city: "",
+  country: "",
+  notes: "",
+  status: "ACTIVE",
+  contractStart: "",
+  contractEnd: "",
+};
+
+function todayUTC(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function contractActive(c: Customer, today: string): boolean {
+  return !!c.contractStart && !!c.contractEnd && c.contractStart <= today && today <= c.contractEnd;
+}
+
+const statusFilters = ["All", "Prospect", "Active", "Inactive", "Churned"] as const;
+
+interface CustomersBoardProps {
+  initialCustomers: Customer[];
+  revenueThisMonth: number | null;
+  canEdit: boolean;
+  canCreateJobs: boolean;
+}
+
+export function CustomersBoard({ initialCustomers, revenueThisMonth, canEdit, canCreateJobs }: CustomersBoardProps) {
+  const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>("All");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showNewModal, setShowNewModal] = useState(false);
+  const [formData, setFormData] = useState(EMPTY_FORM);
+
+  const filteredCustomers = useMemo(() => {
+    return customers.filter((customer) => {
+      const matchesStatus =
+        statusFilter === "All" ||
+        customer.status === statusFilter.toUpperCase();
+
+      const query = searchQuery.toLowerCase();
+      const matchesSearch =
+        query === "" ||
+        customer.name.toLowerCase().includes(query) ||
+        customer.company.toLowerCase().includes(query) ||
+        customer.accountNumber.toLowerCase().includes(query) ||
+        customer.email.toLowerCase().includes(query) ||
+        customer.city.toLowerCase().includes(query);
+
+      return matchesStatus && matchesSearch;
+    });
+  }, [customers, statusFilter, searchQuery]);
+
+  const handleFormChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const closeModal = () => {
+    setShowNewModal(false);
+    setEditingCustomer(null);
+    setFormData(EMPTY_FORM);
+  };
+
+  const openEdit = (c: Customer) => {
+    setEditingCustomer(c);
+    setFormData({
+      name: c.name,
+      company: c.company,
+      email: c.email,
+      phone: c.phone,
+      address: c.address,
+      city: c.city,
+      country: c.country,
+      notes: c.notes,
+      status: c.status,
+      contractStart: c.contractStart,
+      contractEnd: c.contractEnd,
+    });
+    setShowNewModal(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    const result = await saveCustomer(editingCustomer?.id ?? null, formData);
+    setSaving(false);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    const saved = result.data;
+    if (editingCustomer) {
+      setCustomers((prev) => prev.map((c) => (c.id === saved.id ? saved : c)));
+      if (selectedCustomer?.id === saved.id) setSelectedCustomer(saved);
+      toast.success(`${saved.company || saved.name} updated`);
+    } else {
+      setCustomers((prev) => [saved, ...prev]);
+      toast.success(`Customer ${saved.accountNumber} created`);
+    }
+    closeModal();
+  };
+
+  const today = todayUTC();
+  const stats = [
+    {
+      label: "Total Customers",
+      value: customers.length.toLocaleString(),
+      icon: Users,
+      color: "text-blue-600 bg-blue-50",
+    },
+    {
+      label: "Active Contracts",
+      value: customers.filter((c) => contractActive(c, today)).length.toLocaleString(),
+      icon: FileText,
+      color: "text-green-600 bg-green-50",
+    },
+    {
+      label: "Vehicles Tracked",
+      value: customers.reduce((sum, c) => sum + c.trackedVehicles, 0).toLocaleString(),
+      icon: Car,
+      color: "text-purple-600 bg-purple-50",
+    },
+    ...(revenueThisMonth === null
+      ? []
+      : [
+          {
+            label: "Payments This Month",
+            value: formatCurrency(revenueThisMonth),
+            icon: DollarSign,
+            color: "text-emerald-600 bg-emerald-50",
+          },
+        ]),
+  ];
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
+      {/* Page Header */}
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Customer Management
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Manage your clients, contracts, and fleet tracking relationships
+          </p>
+        </div>
+        {canEdit && (
+        <button
+          onClick={() => setShowNewModal(true)}
+          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+        >
+          <Plus className="h-4 w-4" />
+          New Customer
+        </button>
+        )}
+      </div>
+
+      {/* Stats Row */}
+      <div className={cn("mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2", stats.length === 4 ? "lg:grid-cols-4" : "lg:grid-cols-3")}>
+        {stats.map((stat) => (
+          <div
+            key={stat.label}
+            className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">
+                  {stat.label}
+                </p>
+                <p className="mt-1 text-2xl font-bold text-gray-900">
+                  {stat.value}
+                </p>
+              </div>
+              <div className={cn("rounded-lg p-3", stat.color)}>
+                <stat.icon className="h-5 w-5" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filter / Search Bar */}
+      <div className="mb-6 flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-2">
+          {statusFilters.map((filter) => (
+            <button
+              key={filter}
+              onClick={() => setStatusFilter(filter)}
+              className={cn(
+                "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+                statusFilter === filter
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              )}
+            >
+              {filter}
+            </button>
+          ))}
+        </div>
+        <div className="relative w-full sm:w-72">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search customers..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-4 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+        </div>
+      </div>
+
+      {/* Customer Cards Grid */}
+      {filteredCustomers.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-xl border border-gray-200 bg-white py-16 shadow-sm">
+          <Users className="mb-3 h-12 w-12 text-gray-300" />
+          <p className="text-lg font-medium text-gray-500">
+            No customers found
+          </p>
+          <p className="mt-1 text-sm text-gray-400">
+            Try adjusting your filters or search query
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {filteredCustomers.map((customer) => (
+            <div
+              key={customer.id}
+              className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+            >
+              {/* Card Header */}
+              <div className="mb-4 flex items-start justify-between">
+                <div className="min-w-0 flex-1">
+                  <h3 className="truncate text-lg font-semibold text-gray-900">
+                    {customer.company || customer.name}
+                  </h3>
+                  <div className="mt-0.5 flex items-center gap-1.5 text-sm text-gray-500">
+                    <Building2 className="h-3.5 w-3.5 flex-shrink-0" />
+                    <span className="truncate">
+                      {customer.company ? customer.name : "Individual"} · {customer.accountNumber}
+                    </span>
+                  </div>
+                </div>
+                <span
+                  className={cn(
+                    "ml-3 inline-flex flex-shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+                    getStatusColor(customer.status)
+                  )}
+                >
+                  {customer.status}
+                </span>
+              </div>
+
+              {/* Contact Info */}
+              <div className="mb-4 space-y-2">
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <Mail className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                  <span className="truncate">{customer.email || "—"}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <Phone className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                  <span>{customer.phone || "—"}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <MapPin className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                  <span>{customer.city || "—"}</span>
+                </div>
+              </div>
+
+              {/* Vehicles & Contract */}
+              <div className="mb-4 flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2.5">
+                <div className="flex items-center gap-2 text-sm">
+                  <Car className="h-4 w-4 text-gray-500" />
+                  <span className="font-medium text-gray-700">
+                    {customer.vehicles}
+                  </span>
+                  <span className="text-gray-500">vehicles</span>
+                </div>
+                {customer.contractStart && customer.contractEnd ? (
+                  <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                    <Calendar className="h-3.5 w-3.5" />
+                    <span>
+                      {formatDay(customer.contractStart)} &ndash;{" "}
+                      {formatDay(customer.contractEnd)}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-xs italic text-gray-400">
+                    No contract
+                  </span>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2">
+                <button onClick={() => setSelectedCustomer(customer)} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50">
+                  <Users className="h-4 w-4" />
+                  View Details
+                </button>
+                {canCreateJobs && (
+                  <Link href={`/jobcards?customer=${customer.id}`} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700">
+                    <ClipboardList className="h-4 w-4" />
+                    Add Job Card
+                  </Link>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Customer Detail Drawer */}
+      {selectedCustomer && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/50" onClick={() => setSelectedCustomer(null)}>
+          <div
+            className="h-full w-full max-w-md overflow-y-auto bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Drawer Header */}
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <h2 className="text-lg font-semibold text-gray-900">Customer Details</h2>
+              <button
+                onClick={() => setSelectedCustomer(null)}
+                className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Drawer Body */}
+            <div className="px-6 py-5 space-y-6">
+              {/* Name & Status */}
+              <div>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">{selectedCustomer.company || selectedCustomer.name}</h3>
+                    <div className="mt-1 flex items-center gap-1.5 text-sm text-gray-500">
+                      <Building2 className="h-4 w-4" />
+                      <span>{selectedCustomer.company ? `Contact: ${selectedCustomer.name}` : "Individual customer"}</span>
+                    </div>
+                  </div>
+                  <span
+                    className={cn(
+                      "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
+                      getStatusColor(selectedCustomer.status)
+                    )}
+                  >
+                    {selectedCustomer.status}
+                  </span>
+                </div>
+              </div>
+
+              {/* Contact Section */}
+              <div>
+                <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Contact Information</h4>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 text-sm">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                      <Mail className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">Email</p>
+                      <p className="font-medium text-gray-900">{selectedCustomer.email || "—"}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-50 text-green-600">
+                      <Phone className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">Phone</p>
+                      <p className="font-medium text-gray-900">{selectedCustomer.phone || "—"}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 text-purple-600">
+                      <MapPin className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">Address</p>
+                      <p className="font-medium text-gray-900">
+                        {[selectedCustomer.address, selectedCustomer.city, selectedCustomer.country].filter(Boolean).join(", ") || "—"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Fleet Section */}
+              <div>
+                <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Fleet Information</h4>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-gray-700 shadow-sm">
+                      <Car className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-gray-900">{selectedCustomer.vehicles}</p>
+                      <p className="text-xs text-gray-500">
+                        Vehicles ({selectedCustomer.trackedVehicles} with active trackers)
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contract Section */}
+              <div>
+                <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Contract Period</h4>
+                {selectedCustomer.contractStart && selectedCustomer.contractEnd ? (
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-gray-700 shadow-sm">
+                        <Calendar className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {formatDay(selectedCustomer.contractStart)} &ndash; {formatDay(selectedCustomer.contractEnd)}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {contractActive(selectedCustomer, today)
+                            ? "Active contract"
+                            : selectedCustomer.contractEnd < today
+                              ? "Contract expired"
+                              : "Contract not started"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm italic text-gray-400">No contract on file</p>
+                )}
+              </div>
+
+              {/* Customer ID */}
+              <div>
+                <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">Account</h4>
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <span className="font-medium text-gray-400">Account number:</span>
+                  <code className="rounded bg-gray-100 px-2 py-0.5 text-xs font-mono text-gray-600">{selectedCustomer.accountNumber || "—"}</code>
+                </div>
+                {selectedCustomer.notes && (
+                  <p className="mt-3 whitespace-pre-line text-sm text-gray-600">{selectedCustomer.notes}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Drawer Footer */}
+            <div className="flex gap-3 border-t border-gray-200 px-6 py-4">
+              {canEdit && (
+                <button
+                  onClick={() => openEdit(selectedCustomer)}
+                  className="flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                >
+                  <Pencil className="h-4 w-4" />
+                  Edit
+                </button>
+              )}
+              {canCreateJobs && (
+                <Link
+                  href={`/jobcards?customer=${selectedCustomer.id}`}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+                >
+                  <ClipboardList className="h-4 w-4" />
+                  Add Job Card
+                  <ChevronRight className="ml-auto h-4 w-4" />
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Customer Modal */}
+      {showNewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={closeModal}>
+          <div className="w-full max-w-lg rounded-xl bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <h2 className="text-lg font-semibold text-gray-900">
+                {editingCustomer ? `Edit ${editingCustomer.company || editingCustomer.name}` : "New Customer"}
+              </h2>
+              <button
+                onClick={closeModal}
+                className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleSubmit}>
+              <div className="max-h-[65vh] space-y-4 overflow-y-auto px-6 py-4">
+                {/* Name */}
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    Contact name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    required
+                    value={formData.name}
+                    onChange={handleFormChange}
+                    placeholder="Main contact's full name"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Company */}
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    Company
+                  </label>
+                  <input
+                    type="text"
+                    name="company"
+                    value={formData.company}
+                    onChange={handleFormChange}
+                    placeholder="Company or group name"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Email & Phone Row */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                      Email <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      name="email"
+                      required
+                      value={formData.email}
+                      onChange={handleFormChange}
+                      placeholder="email@company.com"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                      Phone
+                    </label>
+                    <input
+                      type="tel"
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleFormChange}
+                      placeholder="+264 61 000 0000"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Address */}
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    Address
+                  </label>
+                  <input
+                    type="text"
+                    name="address"
+                    value={formData.address}
+                    onChange={handleFormChange}
+                    placeholder="Street address"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* City & Country Row */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                      City
+                    </label>
+                    <input
+                      type="text"
+                      name="city"
+                      value={formData.city}
+                      onChange={handleFormChange}
+                      placeholder="City"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                      Country
+                    </label>
+                    <input
+                      type="text"
+                      name="country"
+                      value={formData.country}
+                      onChange={handleFormChange}
+                      placeholder="Country"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {editingCustomer && (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">Status</label>
+                      <select
+                        name="status"
+                        value={formData.status}
+                        onChange={handleFormChange}
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value="PROSPECT">Prospect</option>
+                        <option value="ACTIVE">Active</option>
+                        <option value="INACTIVE">Inactive</option>
+                        <option value="CHURNED">Churned</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">Contract start</label>
+                      <input
+                        type="date"
+                        name="contractStart"
+                        value={formData.contractStart}
+                        onChange={handleFormChange}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">Contract end</label>
+                      <input
+                        type="date"
+                        name="contractEnd"
+                        value={formData.contractEnd}
+                        onChange={handleFormChange}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Notes */}
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    Notes
+                  </label>
+                  <textarea
+                    name="notes"
+                    rows={3}
+                    value={formData.notes}
+                    onChange={handleFormChange}
+                    placeholder="Additional notes about the customer..."
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-60"
+                >
+                  {saving ? "Saving..." : editingCustomer ? "Save Changes" : "Create Customer"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

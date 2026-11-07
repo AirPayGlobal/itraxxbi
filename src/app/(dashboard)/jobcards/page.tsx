@@ -7,10 +7,12 @@ import { JobCardsBoard } from "./jobcards-board";
 
 export const dynamic = "force-dynamic";
 
-export default async function JobCardsPage() {
-  const session = await getServerSession(authOptions);
+export default async function JobCardsPage({ searchParams }: { searchParams: Promise<{ customer?: string }> }) {
+  const [session, { customer }] = await Promise.all([getServerSession(authOptions), searchParams]);
   const role = session?.user.role ?? "VIEWER";
   const data = await getJobCardsPageData(canAccessRoute(role, "/finance"));
+  const canEdit = canWrite(role, "/jobcards");
+  const prefillCustomerId = canEdit && data.customers.some((c) => c.id === customer) ? customer : undefined;
 
   return (
     <JobCardsBoard
@@ -19,7 +21,8 @@ export default async function JobCardsPage() {
       technicians={data.technicians}
       vehicles={data.vehicles}
       revenue={data.revenue}
-      canEdit={canWrite(role, "/jobcards")}
+      canEdit={canEdit}
+      prefillCustomerId={prefillCustomerId}
     />
   );
 }

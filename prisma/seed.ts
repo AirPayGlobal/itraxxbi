@@ -259,6 +259,97 @@ async function linkInvoicesToJobCards() {
   if (invoices.length) console.log(`Linked ${invoices.length} invoices to job cards`);
 }
 
+async function seedContracts() {
+  if ((await prisma.customer.count({ where: { contractStart: { not: null } } })) > 0) return;
+  const rows = await prisma.customer.findMany({ where: { status: { in: ["ACTIVE", "INACTIVE"] } } });
+  for (const c of rows) {
+    // Inactive customers get a contract that ended a month ago; active ones a 12-month term from signup.
+    const start = c.status === "ACTIVE" ? c.createdAt : new Date(Date.now() - 395 * DAY);
+    const end = new Date(start.getTime() + 365 * DAY);
+    await prisma.customer.update({ where: { id: c.id }, data: { contractStart: start, contractEnd: end } });
+  }
+  console.log(`Set contract dates on ${rows.length} customers`);
+}
+
+const demoTickets = [
+  ["GPS tracker not reporting since yesterday", "GPS_DEVICE", "URGENT", "OPEN", 0, null,
+    "Our truck stopped transmitting location data yesterday morning. We rely on live tracking for deliveries.",
+    [["c", "Device last reported at 06:42 yesterday. Vehicle is parked at our depot."]]],
+  ["Install trackers on 3 new Land Cruisers", "INSTALLATION", "HIGH", "IN_PROGRESS", 2, "MANAGER",
+    "We bought three new Land Cruisers and need trackers fitted at our yard.",
+    [["c", "Vehicles are at the depot, available weekdays 08:00–16:00."], ["a", "Booked our team for Thursday at 09:00."], ["c", "Thursday works, thank you!"]]],
+  ["Invoice shows wrong vehicle count", "BILLING", "MEDIUM", "WAITING", 4, "ADMIN",
+    "This month's invoice bills us for 14 vehicles but we only have 12 active units.",
+    [["a", "Two units were reactivated on the 3rd. Can you confirm they're still in service?"]]],
+  ["Geofence alerts firing at the wrong times", "SOFTWARE", "HIGH", "IN_PROGRESS", 1, "TECHNICIAN",
+    "We get exit alerts while vehicles are still inside the Windhoek depot geofence.",
+    [["a", "Looks like the polygon is too tight on the north gate. Adjusting now."]]],
+  ["Intermittent signal loss in the north", "CONNECTIVITY", "MEDIUM", "OPEN", 1, null,
+    "Units drop out between Otjiwarongo and Tsumeb for 20–30 minutes at a time.", []],
+  ["Request driver behaviour report", "GENERAL", "LOW", "RESOLVED", 9, "STAFF",
+    "Please send a harsh braking and speeding report for last quarter.",
+    [["a", "Report attached to your account portal."], ["c", "Got it, thanks."]]],
+  ["Fuel sensor reading 20% low", "GPS_DEVICE", "HIGH", "RESOLVED", 12, "TECHNICIAN",
+    "Fuel level on the reefer truck reads about 20% lower than the gauge.",
+    [["a", "Recalibrated the probe on site. Readings now match the gauge."]]],
+  ["Add two new users to the portal", "SOFTWARE", "LOW", "CLOSED", 20, "STAFF",
+    "Please give our dispatch supervisors access to the tracking portal.",
+    [["a", "Accounts created and login details emailed."]]],
+  ["Panic button pressed by mistake", "GENERAL", "MEDIUM", "CLOSED", 26, "MANAGER",
+    "A driver hit the panic button accidentally. Please clear the alert.", [["a", "Alert cleared and logged as a false alarm."]]],
+  ["Tracker damaged during accident", "GPS_DEVICE", "URGENT", "WAITING", 3, "TECHNICIAN",
+    "One of our vehicles was in an accident and the tracker unit is damaged.",
+    [["a", "We can replace it on Monday. Is the vehicle drivable to our workshop?"]]],
+] as const;
+
+async function seedTickets() {
+  if ((await prisma.ticket.count()) > 0) return;
+  const users = await prisma.user.findMany({ select: { id: true, name: true, role: true } });
+  const byRole = Object.fromEntries(users.map((u) => [u.role, u]));
+  const owners = await prisma.customer.findMany({
+    where: { status: "ACTIVE" },
+    include: { vehicles: { select: { id: true } } },
+    orderBy: { accountNumber: "asc" },
+  });
+  for (const [i, [subject, category, priority, status, age, assignee, description, thread]] of demoTickets.entries()) {
+    const owner = owners[i % owners.length];
+    const createdAt = daysAgo(age, 8 + (i % 6));
+    const prefix = `TKT-${createdAt.getFullYear() % 100}${String(createdAt.getMonth() + 1).padStart(2, "0")}-`;
+    const agent = assignee ? byRole[assignee] : byRole.STAFF;
+    const lastAt = new Date(Math.min(createdAt.getTime() + thread.length * 3 * 3600 * 1000, Date.now() - 10 * 60 * 1000));
+    await prisma.ticket.create({
+      data: {
+        ticketNumber: `${prefix}${String(i + 1).padStart(4, "0")}`,
+        subject,
+        description,
+        category,
+        priority,
+        status,
+        contactName: owner.name,
+        contactEmail: owner.email,
+        contactPhone: owner.phone,
+        customerId: owner.id,
+        vehicleId: category === "GPS_DEVICE" ? owner.vehicles[0]?.id : null,
+        assignedToId: assignee ? byRole[assignee].id : null,
+        createdById: byRole.STAFF.id,
+        resolvedAt: status === "RESOLVED" || status === "CLOSED" ? lastAt : null,
+        createdAt,
+        updatedAt: lastAt,
+        replies: {
+          create: thread.map(([who, message], k) => ({
+            message,
+            fromCustomer: who === "c",
+            authorName: who === "c" ? owner.name : agent.name,
+            userId: who === "c" ? null : agent.id,
+            createdAt: new Date(Math.min(createdAt.getTime() + (k + 1) * 3 * 3600 * 1000, lastAt.getTime())),
+          })),
+        },
+      },
+    });
+  }
+  console.log(`Seeded ${demoTickets.length} tickets`);
+}
+
 async function main() {
   for (const user of demoUsers) {
     const hashedPassword = await bcrypt.hash(user.password, 12);
@@ -273,6 +364,8 @@ async function main() {
   await seedProjects();
   await seedVehicles();
   await linkInvoicesToJobCards();
+  await seedContracts();
+  await seedTickets();
 }
 
 main()

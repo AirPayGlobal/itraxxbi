@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import {
   Plus,
@@ -110,9 +110,10 @@ interface JobCardsBoardProps {
   vehicles: VehicleOption[];
   revenue: number | null;
   canEdit: boolean;
+  prefillCustomerId?: string;
 }
 
-export function JobCardsBoard({ initialJobCards, customers, technicians, vehicles, revenue, canEdit }: JobCardsBoardProps) {
+export function JobCardsBoard({ initialJobCards, customers, technicians, vehicles, revenue, canEdit, prefillCustomerId }: JobCardsBoardProps) {
   // Job cards state
   const [jobCards, setJobCards] = useState<JobCard[]>(initialJobCards);
   const [editingJob, setEditingJob] = useState<JobCard | null>(null);
@@ -128,10 +129,17 @@ export function JobCardsBoard({ initialJobCards, customers, technicians, vehicle
   const [searchQuery, setSearchQuery] = useState("");
 
   // Modal
-  const [showModal, setShowModal] = useState(false);
+  const [showModal, setShowModal] = useState(!!prefillCustomerId);
 
   // Form state
-  const [formData, setFormData] = useState(EMPTY_FORM);
+  const [formData, setFormData] = useState(
+    prefillCustomerId ? { ...EMPTY_FORM, customerId: prefillCustomerId } : EMPTY_FORM
+  );
+
+  // Drop ?customer= once the form has opened so a reload doesn't reopen it.
+  useEffect(() => {
+    if (prefillCustomerId) window.history.replaceState(null, "", "/jobcards");
+  }, [prefillCustomerId]);
   const customerVehicles = vehicles.filter((v) => v.customerId === formData.customerId);
 
   const stats = useMemo(() => {
