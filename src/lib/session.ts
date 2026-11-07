@@ -13,8 +13,8 @@ export interface CurrentUser {
 
 /**
  * The signed-in person's app account, or null if they aren't signed in, weren't invited, or were deactivated.
- * Roles live in our database; Clerk only proves identity. On first sign-in the Clerk account is linked to the
- * invited user row by verified email.
+ * Roles live in our database; Clerk only proves identity. When a Clerk account isn't linked yet, it is linked to
+ * the user row with the same verified email.
  */
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const { userId } = await auth();
@@ -29,8 +29,10 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
         .filter((e) => e.verification?.status === "verified")
         .map((e) => e.emailAddress.toLowerCase()) ?? [];
     if (emails.length) {
+      // Also relinks rows tied to an older Clerk ID, e.g. after moving from the development to the production
+      // instance. Safe because Clerk verified the email and emails are unique within an instance.
       const invited = await prisma.user.findFirst({
-        where: { email: { in: emails }, clerkId: null },
+        where: { email: { in: emails } },
         select: { id: true },
       });
       if (invited) {
