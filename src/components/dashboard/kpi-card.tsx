@@ -8,7 +8,7 @@ import { ArrowUp, ArrowDown } from "lucide-react";
 interface KpiCardProps {
   title: string;
   value: string;
-  change: number;
+  change: number | null;
   changeLabel: string;
   icon: ReactNode;
   color: string;
@@ -24,7 +24,7 @@ export function KpiCard({
   color,
   index = 0,
 }: KpiCardProps) {
-  const isPositive = change >= 0;
+  const isPositive = (change ?? 0) >= 0;
 
   return (
     <motion.div
@@ -41,6 +41,10 @@ export function KpiCard({
             {value}
           </p>
           <div className="mt-3 flex items-center gap-1.5">
+            {change === null ? (
+              <span className="text-xs text-slate-400">Nothing to compare yet</span>
+            ) : (
+            <>
             <span
               className={cn(
                 "inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold",
@@ -57,6 +61,8 @@ export function KpiCard({
               {Math.abs(change)}%
             </span>
             <span className="text-xs text-slate-400">{changeLabel}</span>
+            </>
+            )}
           </div>
         </div>
         <div
