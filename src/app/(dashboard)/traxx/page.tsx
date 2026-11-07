@@ -579,6 +579,10 @@ export default function TraxxAIPage() {
   const showSuggestions = messages.length <= 1;
 
   // --- Effects ---
+  // Greeting, timestamps and due dates depend on the viewer's clock, so skip the prerender.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isTyping]);
@@ -792,6 +796,8 @@ export default function TraxxAIPage() {
   };
 
   // --- Render ---
+  if (!mounted) return <div className="h-[calc(100vh-4rem)] bg-slate-50" />;
+
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col bg-slate-50">
       {/* Reminders Bar */}
