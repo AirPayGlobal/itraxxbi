@@ -1,6 +1,5 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { canAccessRoute } from "@/lib/role-access";
+import { getCurrentUser } from "@/lib/session";
 
 export function canWrite(role: string, route: string): boolean {
   return role !== "VIEWER" && canAccessRoute(role, route);
@@ -8,9 +7,9 @@ export function canWrite(role: string, route: string): boolean {
 
 /** Returns the signed-in user if they may change records behind `route`, otherwise null. */
 export async function getWriter(route: string) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user || !canWrite(session.user.role, route)) return null;
-  return session.user;
+  const user = await getCurrentUser();
+  if (!user || !canWrite(user.role, route)) return null;
+  return user;
 }
 
 export type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string };

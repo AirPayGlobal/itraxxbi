@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useCurrentUser } from "@/components/providers/current-user";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { canAccessRoute } from "@/lib/role-access";
@@ -29,6 +29,7 @@ import {
   Funnel,
   UserCheck,
   FolderKanban,
+  ShieldCheck,
 } from "lucide-react";
 
 const navigationItems = [
@@ -50,6 +51,7 @@ const navigationItems = [
   { label: "Meeting AI", href: "/meeting-ai", icon: MessageSquare },
   { label: "TRAXX AI", href: "/traxx", icon: Bot },
   { label: "Settings", href: "/settings", icon: Settings },
+  { label: "Team & Access", href: "/settings/team", icon: ShieldCheck },
 ];
 
 interface SidebarProps {
@@ -60,7 +62,7 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle, onOpenCommand }: SidebarProps) {
   const pathname = usePathname();
-  const { data: session } = useSession();
+  const user = useCurrentUser();
   const [customLogo, setCustomLogo] = useState<string | null>(null);
 
   useEffect(() => {
@@ -70,10 +72,12 @@ export function Sidebar({ collapsed, onToggle, onOpenCommand }: SidebarProps) {
     return () => window.removeEventListener("company-logo-changed", handler);
   }, []);
 
-  const isActive = (href: string) => {
-    if (href === "/") return pathname === "/";
-    return pathname.startsWith(href);
-  };
+  // Highlight only the most specific match, so /settings/team doesn't also light up Settings.
+  const activeHref = navigationItems
+    .map((item) => item.href)
+    .filter((href) => (href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`)))
+    .sort((a, b) => b.length - a.length)[0];
+  const isActive = (href: string) => href === activeHref;
 
   const logoSrc = customLogo || "/logo-wordmark.svg";
 
@@ -121,7 +125,7 @@ export function Sidebar({ collapsed, onToggle, onOpenCommand }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-2">
-        {navigationItems.filter((item) => session?.user?.role ? canAccessRoute(session.user.role, item.href) : true).map((item) => {
+        {navigationItems.filter((item) => (user ? canAccessRoute(user.role, item.href) : false)).map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);
 

@@ -14,7 +14,7 @@ model User {
   id         String   @id @default(cuid())
   email      String   @unique
   name       String
-  password   String
+  clerkId    String?  @unique
   role       UserRole @default(STAFF)
   phone      String?
   avatar     String?
@@ -25,12 +25,12 @@ model User {
   updatedAt  DateTime @updatedAt
 
   // Relations
-  assignedTasks    Task[]               @relation("AssignedTo")
-  createdTasks     Task[]               @relation("CreatedBy")
-  jobCards         JobCard[]            @relation("TechnicianJobs")
-  createdJobCards  JobCard[]            @relation("CreatedByUser")
+  assignedTasks    Task[]            @relation("AssignedTo")
+  createdTasks     Task[]            @relation("CreatedBy")
+  jobCards         JobCard[]         @relation("TechnicianJobs")
+  createdJobCards  JobCard[]         @relation("CreatedByUser")
   leaveRequests    LeaveRequest[]
-  approvedLeaves   LeaveRequest[]       @relation("ApprovedBy")
+  approvedLeaves   LeaveRequest[]    @relation("ApprovedBy")
   performanceKPIs  PerformanceKPI[]
   documents        Document[]
   notifications    Notification[]
@@ -38,24 +38,11 @@ model User {
   comments         Comment[]
   assetAssignments AssetAssignment[]
   employee         Employee?
-  resetTokens      PasswordResetToken[]
-  assignedTickets  Ticket[]             @relation("AssignedTickets")
-  createdTickets   Ticket[]             @relation("CreatedTickets")
+  assignedTickets  Ticket[]          @relation("AssignedTickets")
+  createdTickets   Ticket[]          @relation("CreatedTickets")
   ticketReplies    TicketReply[]
 
   @@map("users")
-}
-
-model PasswordResetToken {
-  id        String    @id @default(cuid())
-  token     String    @unique
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime  @default(now())
-
-  @@map("password_reset_tokens")
 }
 
 enum UserRole {

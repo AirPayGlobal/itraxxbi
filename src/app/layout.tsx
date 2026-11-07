@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { Toaster } from "sonner";
-import AuthSessionProvider from "@/components/providers/session-provider";
+import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 
 // Self-hosted from npm so builds don't depend on reaching Google Fonts.
@@ -34,7 +34,23 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${montserrat.variable}`}>
       <body className="font-sans antialiased">
-        <AuthSessionProvider>
+        <ClerkProvider
+          signInUrl="/sign-in"
+          signUpUrl="/sign-up"
+          signInFallbackRedirectUrl="/"
+          signUpFallbackRedirectUrl="/"
+          afterSignOutUrl="/sign-in"
+          appearance={{
+            variables: {
+              colorPrimary: "#1676c4",
+              colorForeground: "#23272e",
+              colorBackground: "#ffffff",
+              colorBorder: "#e2e8f0",
+              fontFamily: "var(--font-inter), ui-sans-serif, system-ui, sans-serif",
+              borderRadius: "0.5rem",
+            },
+          }}
+        >
         {children}
         <Toaster
           position="top-right"
@@ -52,7 +68,7 @@ export default function RootLayout({
           }}
           richColors
         />
-        </AuthSessionProvider>
+        </ClerkProvider>
       </body>
     </html>
   );

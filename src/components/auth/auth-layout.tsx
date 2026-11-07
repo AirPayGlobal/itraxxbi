@@ -4,8 +4,8 @@ import Link from "next/link";
 
 interface AuthLayoutProps {
   children: React.ReactNode;
-  title: string;
-  subtitle: string;
+  title?: string;
+  subtitle?: string;
 }
 
 function SignalArcs({ className }: { className?: string }) {
@@ -35,7 +35,7 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
         <SignalArcs className="pointer-events-none absolute -right-24 -top-24 h-[520px] w-[520px] rotate-90 opacity-[0.14]" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1 bg-signal" />
 
-        <Link href="/login" className="relative flex items-center">
+        <Link href="/sign-in" className="relative flex items-center">
           <img src="/logo-dark.svg" alt="iTrackerX — Fleet Data Intelligence" className="h-14 w-auto" />
         </Link>
         <div className="relative max-w-md">
@@ -54,16 +54,18 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
 
       {/* Right panel - form */}
       <div className="flex w-full flex-col items-center justify-center bg-slate-50 px-6 lg:w-1/2">
-        <div className="w-full max-w-md">
+        <div className="flex w-full max-w-md flex-col items-center lg:items-stretch">
           {/* Mobile logo */}
           <div className="mb-8 flex justify-center lg:hidden">
             <img src="/logo.svg" alt="iTrackerX — Fleet Data Intelligence" className="h-12 w-auto" />
           </div>
 
-          <div className="mb-8">
-            <h1 className="text-2xl font-bold text-ink-800">{title}</h1>
-            <p className="mt-2 text-sm text-slate-500">{subtitle}</p>
-          </div>
+          {title && (
+            <div className="mb-8">
+              <h1 className="text-2xl font-bold text-ink-800">{title}</h1>
+              {subtitle && <p className="mt-2 text-sm text-slate-500">{subtitle}</p>}
+            </div>
+          )}
 
           {children}
         </div>

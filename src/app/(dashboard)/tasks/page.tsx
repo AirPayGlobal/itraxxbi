@@ -1,5 +1,4 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/session";
 import { canWrite } from "@/lib/permissions";
 import { getTasksPageData } from "@/lib/tasks";
 import { TasksBoard } from "./tasks-board";
@@ -7,14 +6,14 @@ import { TasksBoard } from "./tasks-board";
 export const dynamic = "force-dynamic";
 
 export default async function TasksPage() {
-  const [session, data] = await Promise.all([getServerSession(authOptions), getTasksPageData()]);
+  const [user, data] = await Promise.all([getCurrentUser(), getTasksPageData()]);
 
   return (
     <TasksBoard
       initialTasks={data.tasks}
       projects={data.projects}
       assignees={data.assignees}
-      canEdit={canWrite(session?.user.role ?? "VIEWER", "/tasks")}
+      canEdit={canWrite(user?.role ?? "VIEWER", "/tasks")}
     />
   );
 }

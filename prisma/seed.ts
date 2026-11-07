@@ -1,7 +1,6 @@
 import "dotenv/config";
 import { PrismaClient, UserRole } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
-import bcrypt from "bcryptjs";
 
 const adapter = new PrismaPg(process.env.DATABASE_URL!);
 const prisma = new PrismaClient({ adapter });
@@ -11,7 +10,6 @@ const demoUsers = [
     email: "admin@itrackerx.com",
     name: "Admin User",
     role: UserRole.ADMIN,
-    password: "admin123",
     department: "Management",
     jobTitle: "System Administrator",
   },
@@ -19,7 +17,6 @@ const demoUsers = [
     email: "manager@itrackerx.com",
     name: "Sarah Manager",
     role: UserRole.MANAGER,
-    password: "manager123",
     department: "Operations",
     jobTitle: "Operations Manager",
   },
@@ -27,7 +24,6 @@ const demoUsers = [
     email: "technician@itrackerx.com",
     name: "John Technician",
     role: UserRole.TECHNICIAN,
-    password: "tech123",
     department: "Technical",
     jobTitle: "Senior Technician",
   },
@@ -35,7 +31,6 @@ const demoUsers = [
     email: "staff@itrackerx.com",
     name: "Jane Staff",
     role: UserRole.STAFF,
-    password: "staff123",
     department: "Administration",
     jobTitle: "Office Administrator",
   },
@@ -43,7 +38,6 @@ const demoUsers = [
     email: "viewer@itrackerx.com",
     name: "Mike Viewer",
     role: UserRole.VIEWER,
-    password: "viewer123",
     department: "External",
     jobTitle: "Auditor",
   },
@@ -351,15 +345,23 @@ async function seedTickets() {
 }
 
 async function main() {
+  // Demo staff own the sample tasks, job cards and tickets. Sign-in is through Clerk, so they can only log in
+  // if someone with that email is invited.
   for (const user of demoUsers) {
-    const hashedPassword = await bcrypt.hash(user.password, 12);
-    await prisma.user.upsert({
-      where: { email: user.email },
-      update: {},
-      create: { ...user, password: hashedPassword },
-    });
+    await prisma.user.upsert({ where: { email: user.email }, update: {}, create: user });
   }
-  console.log("Seed complete: 5 demo users created");
+  console.log(`Seed complete: ${demoUsers.length} demo users`);
+
+  // Access is invite-only, so the first administrator is created here. They sign in through Clerk with this email.
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  if (adminEmail) {
+    await prisma.user.upsert({
+      where: { email: adminEmail },
+      update: { role: UserRole.ADMIN, isActive: true },
+      create: { email: adminEmail, name: process.env.ADMIN_NAME?.trim() || "Administrator", role: UserRole.ADMIN },
+    });
+    console.log(`Admin access granted to ${adminEmail}`);
+  }
   await seedBusinessData();
   await seedProjects();
   await seedVehicles();
