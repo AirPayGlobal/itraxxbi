@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
 import { AuthLayout } from "@/components/auth/auth-layout";
@@ -10,6 +10,8 @@ import { createClient } from "@/lib/supabase/client";
 function ResetPasswordForm() {
   const router = useRouter();
   const supabase = createClient();
+  // Invited people arrive here from /auth/confirm already signed in; they choose their first password.
+  const isInvite = useSearchParams().get("invite") === "1";
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -44,25 +46,28 @@ function ResetPasswordForm() {
 
   if (hasRecoverySession === false) {
     return (
-      <AuthLayout title="Invalid link" subtitle="This reset link appears to be broken">
+      <AuthLayout title="Invalid link" subtitle={isInvite ? "This invitation link appears to be broken" : "This reset link appears to be broken"}>
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-center">
           <AlertTriangle className="mx-auto mb-3 h-12 w-12 text-amber-500" />
           <h3 className="text-lg font-semibold text-amber-800">
-            Missing reset token
+            {isInvite ? "Invitation expired" : "Missing reset token"}
           </h3>
           <p className="mt-2 text-sm text-amber-700">
-            This link is invalid or has expired. Please request a new password
-            reset.
+            {isInvite
+              ? "This invitation link is invalid or has expired. Ask your administrator to send a new one."
+              : "This link is invalid or has expired. Please request a new password reset."}
           </p>
         </div>
-        <div className="mt-6 text-center">
-          <Link
-            href="/forgot-password"
-            className="text-sm font-semibold text-blue-600 hover:text-blue-700"
-          >
-            Request new reset link
-          </Link>
-        </div>
+        {!isInvite && (
+          <div className="mt-6 text-center">
+            <Link
+              href="/forgot-password"
+              className="text-sm font-semibold text-blue-600 hover:text-blue-700"
+            >
+              Request new reset link
+            </Link>
+          </div>
+        )}
       </AuthLayout>
     );
   }
@@ -93,19 +98,19 @@ function ResetPasswordForm() {
 
     await supabase.auth.signOut();
     setSuccess(true);
-    setTimeout(() => router.push("/login"), 3000);
+    setTimeout(() => router.push(isInvite ? "/" : "/login"), isInvite ? 1500 : 3000);
   }
 
   if (success) {
     return (
-      <AuthLayout title="Password reset" subtitle="Your password has been updated">
+      <AuthLayout title={isInvite ? "You're all set" : "Password reset"} subtitle="Your password has been updated">
         <div className="rounded-xl border border-green-200 bg-green-50 p-6 text-center">
           <CheckCircle2 className="mx-auto mb-3 h-12 w-12 text-green-500" />
           <h3 className="text-lg font-semibold text-green-800">
             Password updated!
           </h3>
           <p className="mt-2 text-sm text-green-700">
-            Your password has been reset successfully. Redirecting to login...
+            {isInvite ? "Taking you to your dashboard..." : "Your password has been reset successfully. Redirecting to login..."}
           </p>
         </div>
       </AuthLayout>
@@ -113,7 +118,10 @@ function ResetPasswordForm() {
   }
 
   return (
-    <AuthLayout title="Reset your password" subtitle="Enter your new password below">
+    <AuthLayout
+      title={isInvite ? "Set your password" : "Reset your password"}
+      subtitle={isInvite ? "Choose a password to finish setting up your account" : "Enter your new password below"}
+    >
       {error && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}

@@ -52,6 +52,17 @@ async function findUserByEmail(email) {
 let created = 0;
 let updated = 0;
 
+// Roles come from invitations, not sign-up metadata (see 20261110000000_lock_down_roles.sql).
+{
+  const { error } = await admin.from("invitations").upsert(
+    demoUsers.map((u) => ({ email: u.email, name: u.name, role: u.role, department: u.department, job_title: u.job_title }))
+  );
+  if (error) {
+    console.error(`Could not create invitations: ${error.message}`);
+    process.exit(1);
+  }
+}
+
 for (const u of demoUsers) {
   const meta = {
     name: u.name,
@@ -84,6 +95,12 @@ for (const u of demoUsers) {
       console.log(`+ created ${u.email}`);
     }
   }
+}
+
+// Existing users keep their old profile row, so apply the role directly.
+for (const u of demoUsers) {
+  const { error } = await admin.from("profiles").update({ role: u.role, is_active: true, name: u.name }).eq("email", u.email);
+  if (error) console.error(`! profile ${u.email}: ${error.message}`);
 }
 
 console.log(`\nDone. ${created} created, ${updated} updated.`);

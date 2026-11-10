@@ -22,7 +22,11 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(
+    searchParams.get("error") === "invite_invalid"
+      ? "That invitation link is invalid or has expired. Ask your administrator to send a new one."
+      : ""
+  );
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -118,25 +122,8 @@ function LoginForm() {
       </form>
 
       <p className="mt-6 text-center text-sm text-slate-500">
-        Don&apos;t have an account?{" "}
-        <Link
-          href="/register"
-          className="font-semibold text-blue-600 hover:text-blue-700"
-        >
-          Create an account
-        </Link>
+        Access is by invitation. Ask your administrator if you need an account.
       </p>
-
-      <div className="mt-8 rounded-lg border border-slate-200 bg-white p-4">
-        <p className="mb-2 text-center text-xs font-medium text-slate-400 uppercase tracking-wider">
-          Demo credentials
-        </p>
-        <div className="space-y-1 text-center text-xs text-slate-500">
-          <p><span className="font-medium">Admin:</span> admin@itrackerx.com / admin123</p>
-          <p><span className="font-medium">Manager:</span> manager@itrackerx.com / manager123</p>
-          <p><span className="font-medium">Technician:</span> technician@itrackerx.com / tech123</p>
-        </div>
-      </div>
     </AuthLayout>
   );
 }
