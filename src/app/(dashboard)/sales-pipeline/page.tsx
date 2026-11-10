@@ -375,7 +375,7 @@ const monthlyRevenue = [
 ];
 
 const sourceData = [
-  { name: "Referral", value: 4, color: "#3b82f6" },
+  { name: "Referral", value: 4, color: "#1e8fe0" },
   { name: "Website", value: 3, color: "#8b5cf6" },
   { name: "Cold Outreach", value: 2, color: "#f59e0b" },
   { name: "Trade Show", value: 1, color: "#10b981" },

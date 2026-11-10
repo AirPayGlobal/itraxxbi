@@ -50,6 +50,7 @@ const routeTitles: Record<string, string> = {
   "/meeting-ai": "Meeting AI",
   "/traxx": "TRAXX AI",
   "/settings": "Settings",
+  "/settings/team": "Team & Access",
 };
 
 function getPageTitle(pathname: string): string {

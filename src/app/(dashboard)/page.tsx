@@ -36,7 +36,7 @@ import type { Priority } from "@/lib/supabase/database.types";
 const JOB_STATUS_CHART: { key: string; label: string; fill: string }[] = [
   { key: "OPEN", label: "Open", fill: "#64748b" },
   { key: "ASSIGNED", label: "Assigned", fill: "#8b5cf6" },
-  { key: "IN_PROGRESS", label: "In Progress", fill: "#3b82f6" },
+  { key: "IN_PROGRESS", label: "In Progress", fill: "#1e8fe0" },
   { key: "COMPLETED", label: "Completed", fill: "#22c55e" },
   { key: "INVOICED", label: "Invoiced", fill: "#10b981" },
 ];
@@ -132,7 +132,8 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-slate-50 p-6 lg:p-8">
       {/* Welcome header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-900">
+        <p className="eyebrow text-brand-600">Fleet Data Intelligence</p>
+        <h1 className="mt-1 text-2xl font-bold text-ink-800">
           Welcome back to ITRACKERX
         </h1>
         <p className="mt-1 text-sm text-slate-500">{formatCurrentDate()}</p>
@@ -236,9 +237,9 @@ export default function DashboardPage() {
             <Line
               type="monotone"
               dataKey="revenue"
-              stroke="#3b82f6"
+              stroke="#1e8fe0"
               strokeWidth={2}
-              dot={{ fill: "#3b82f6", r: 4 }}
+              dot={{ fill: "#1e8fe0", r: 4 }}
               activeDot={{ r: 6 }}
             />
           </LineChart>

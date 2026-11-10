@@ -1,11 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none">
-  <!-- IX box -->
-  <rect x="0" y="0" width="40" height="40" rx="8" fill="#2563EB"/>
-  <!-- I -->
-  <text x="6" y="29" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="22" fill="white">I</text>
-  <!-- X -->
-  <text x="15" y="29" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="22" fill="white">X</text>
-  <!-- Signal waves -->
-  <path d="M30 12 C32.5 10, 35.5 10, 38 12" stroke="white" stroke-width="2" stroke-linecap="round" fill="none"/>
-  <path d="M28 7 C32 3, 36 3, 40 7" stroke="white" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.7"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" role="img" aria-label="iTrackerX">
+  <defs>
+    <linearGradient id="ixi-bg" x1="0" y1="48" x2="48" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#145FA3"/>
+      <stop offset="1" stop-color="#1E8FE0"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="11" fill="url(#ixi-bg)"/>
+  <path d="M9 18 27 40M9 40 27 18" stroke="#fff" stroke-width="5"/>
+  <g stroke="#fff" stroke-width="3.2" stroke-linecap="round">
+    <path d="M28.5 11.5a6.5 6.5 0 0 1 6.5 6.5" opacity="1"/>
+    <path d="M28.5 5a13 13 0 0 1 13 13" opacity="0.8"/>
+  </g>
 </svg>

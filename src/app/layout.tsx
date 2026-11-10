@@ -1,8 +1,25 @@
 import type { Metadata } from "next";
+import localFont from "next/font/local";
 import { Toaster } from "sonner";
 import AuthSessionProvider from "@/components/providers/session-provider";
 import QueryProvider from "@/components/providers/query-provider";
 import "./globals.css";
+
+// Self-hosted from npm so builds don't depend on reaching Google Fonts.
+const inter = localFont({
+  src: "../../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2",
+  weight: "100 900",
+  variable: "--font-inter",
+  display: "swap",
+});
+const montserrat = localFont({
+  src: [
+    { path: "../../node_modules/@fontsource/montserrat/files/montserrat-latin-600-normal.woff2", weight: "600" },
+    { path: "../../node_modules/@fontsource/montserrat/files/montserrat-latin-700-normal.woff2", weight: "700" },
+  ],
+  variable: "--font-montserrat",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "iTraxx BI - Business Intelligence Platform",
@@ -16,7 +33,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${inter.variable} ${montserrat.variable}`}>
       <body className="font-sans antialiased">
         <AuthSessionProvider>
         <QueryProvider>
