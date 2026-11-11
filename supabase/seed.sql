@@ -1,51 +1,12 @@
--- LOCAL ONLY — runs via `supabase db reset` against the local dev stack.
+-- Local development seed (runs on `supabase db reset`).
 --
--- DO NOT run this against a hosted/remote Supabase project. Inserting into
--- auth.users with raw SQL leaves columns GoTrue depends on unset, which breaks
--- login with "Database error querying schema" / a 500 "server configuration"
--- page. For a remote project create the demo users with the Admin API instead:
---   npm run seed:users   (see scripts/seed-remote-users.mjs)
---
--- The on_auth_user_created trigger populates public.profiles from metadata.
-
-insert into auth.users (
-  id, instance_id, aud, role, email, encrypted_password,
-  email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
-  created_at, updated_at, confirmation_token, email_change, email_change_token_new, recovery_token
-) values
-  (
-    gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
-    'admin@itrackerx.com', crypt('admin123', gen_salt('bf')),
-    now(), '{"provider":"email","providers":["email"]}'::jsonb,
-    '{"name":"Admin User","role":"ADMIN","department":"Management","job_title":"System Administrator"}'::jsonb,
-    now(), now(), '', '', '', ''
-  ),
-  (
-    gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
-    'manager@itrackerx.com', crypt('manager123', gen_salt('bf')),
-    now(), '{"provider":"email","providers":["email"]}'::jsonb,
-    '{"name":"Sarah Manager","role":"MANAGER","department":"Operations","job_title":"Operations Manager"}'::jsonb,
-    now(), now(), '', '', '', ''
-  ),
-  (
-    gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
-    'technician@itrackerx.com', crypt('tech123', gen_salt('bf')),
-    now(), '{"provider":"email","providers":["email"]}'::jsonb,
-    '{"name":"John Technician","role":"TECHNICIAN","department":"Technical","job_title":"Senior Technician"}'::jsonb,
-    now(), now(), '', '', '', ''
-  ),
-  (
-    gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
-    'staff@itrackerx.com', crypt('staff123', gen_salt('bf')),
-    now(), '{"provider":"email","providers":["email"]}'::jsonb,
-    '{"name":"Jane Staff","role":"STAFF","department":"Administration","job_title":"Office Administrator"}'::jsonb,
-    now(), now(), '', '', '', ''
-  ),
-  (
-    gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
-    'viewer@itrackerx.com', crypt('viewer123', gen_salt('bf')),
-    now(), '{"provider":"email","providers":["email"]}'::jsonb,
-    '{"name":"Mike Viewer","role":"VIEWER","department":"External","job_title":"Auditor"}'::jsonb,
-    now(), now(), '', '', '', ''
-  )
-on conflict (email) do nothing;
+-- Sign-in is handled by Clerk, so demo users are profiles only. Each links to a
+-- Clerk account the first time someone signs in with that email; with sign-up
+-- restricted, invite the email in your Clerk development instance first.
+insert into public.profiles (id, email, name, role, department, job_title, is_active) values
+  ('11111111-1111-1111-1111-111111111111', 'admin@itrackerx.com',      'Admin User',      'ADMIN',      'Management',     'System Administrator', true),
+  ('22222222-2222-2222-2222-222222222222', 'manager@itrackerx.com',    'Sarah Manager',   'MANAGER',    'Operations',     'Operations Manager',   true),
+  ('33333333-3333-3333-3333-333333333333', 'technician@itrackerx.com', 'John Technician', 'TECHNICIAN', 'Technical',      'Senior Technician',    true),
+  ('44444444-4444-4444-4444-444444444444', 'staff@itrackerx.com',      'Jane Staff',      'STAFF',      'Administration', 'Office Administrator', true),
+  ('55555555-5555-5555-5555-555555555555', 'viewer@itrackerx.com',     'Mike Viewer',     'VIEWER',     'External',       'Auditor',              true)
+on conflict (id) do nothing;
