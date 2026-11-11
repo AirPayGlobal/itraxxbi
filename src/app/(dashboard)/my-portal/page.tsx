@@ -36,6 +36,7 @@ import {
   Download,
   Send,
 } from "lucide-react";
+import { toast } from "sonner";
 import { cn, formatCurrency, formatDate, getStatusColor, getPriorityColor } from "@/lib/utils";
 import { getActivityLogForEmployee } from "@/lib/activity-store";
 import { getPayslipsForEmployee, type Payslip } from "@/lib/payslip-engine";
@@ -376,6 +377,12 @@ export default function MyPortalPage() {
   const [tasks, setTasks] = useState<MyTask[]>(myTasks);
   const [payslipModal, setPayslipModal] = useState<Payslip | null>(null);
   const [leaveModalOpen, setLeaveModalOpen] = useState(false);
+  const [leaveForm, setLeaveForm] = useState({
+    leaveType: "Annual Leave",
+    startDate: "",
+    endDate: "",
+    reason: "",
+  });
 
   // Fetch live data
   const activityLog = useMemo(() => getActivityLogForEmployee(EMPLOYEE_ID), []);
@@ -987,7 +994,10 @@ export default function MyPortalPage() {
                 >
                   Close
                 </button>
-                <button className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors">
+                <button
+                  onClick={() => toast.success("Downloading payslip PDF...")}
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+                >
                   <Download className="h-4 w-4" />
                   Download PDF
                 </button>
@@ -1137,12 +1147,18 @@ export default function MyPortalPage() {
                 className="space-y-4"
                 onSubmit={(e) => {
                   e.preventDefault();
+                  toast.success("Leave request submitted");
                   setLeaveModalOpen(false);
+                  setLeaveForm({ leaveType: "Annual Leave", startDate: "", endDate: "", reason: "" });
                 }}
               >
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-gray-700">Leave Type</label>
-                  <select className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
+                  <select
+                    value={leaveForm.leaveType}
+                    onChange={(e) => setLeaveForm((prev) => ({ ...prev, leaveType: e.target.value }))}
+                    className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  >
                     <option>Annual Leave</option>
                     <option>Sick Leave</option>
                     <option>Compassionate Leave</option>
@@ -1153,6 +1169,8 @@ export default function MyPortalPage() {
                     <label className="mb-1.5 block text-sm font-medium text-gray-700">Start Date</label>
                     <input
                       type="date"
+                      value={leaveForm.startDate}
+                      onChange={(e) => setLeaveForm((prev) => ({ ...prev, startDate: e.target.value }))}
                       className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                     />
                   </div>
@@ -1160,6 +1178,8 @@ export default function MyPortalPage() {
                     <label className="mb-1.5 block text-sm font-medium text-gray-700">End Date</label>
                     <input
                       type="date"
+                      value={leaveForm.endDate}
+                      onChange={(e) => setLeaveForm((prev) => ({ ...prev, endDate: e.target.value }))}
                       className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                     />
                   </div>
@@ -1168,6 +1188,8 @@ export default function MyPortalPage() {
                   <label className="mb-1.5 block text-sm font-medium text-gray-700">Reason</label>
                   <textarea
                     rows={3}
+                    value={leaveForm.reason}
+                    onChange={(e) => setLeaveForm((prev) => ({ ...prev, reason: e.target.value }))}
                     className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 resize-none"
                     placeholder="Brief description..."
                   />
@@ -1254,8 +1276,16 @@ export default function MyPortalPage() {
         >
           <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start">
             {/* Avatar */}
-            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-2xl font-bold text-white shadow-lg">
-              JM
+            <div className="flex flex-col items-center gap-2">
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-2xl font-bold text-white shadow-lg">
+                JM
+              </div>
+              <button
+                onClick={() => toast.info("Photo upload — coming soon")}
+                className="text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
+              >
+                Change Photo
+              </button>
             </div>
             <div className="flex-1 text-center sm:text-left">
               <h3 className="text-xl font-bold text-gray-900">John Mutua</h3>

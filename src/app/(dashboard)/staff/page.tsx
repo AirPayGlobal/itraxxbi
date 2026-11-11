@@ -266,7 +266,7 @@ function EmployeeDetailModal({
                 <Ticket className="h-4 w-4 text-blue-500" />
                 Ticket Performance Metrics
               </h3>
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
                   <p className="text-xs text-slate-500">Tickets Resolved</p>
                   <p className="mt-1 text-xl font-bold text-green-600">
@@ -475,7 +475,7 @@ export default function StaffPerformancePage() {
         s.overallScore >= 90
           ? "#22c55e"
           : s.overallScore >= 80
-            ? "#3b82f6"
+            ? "#1e8fe0"
             : s.overallScore >= 70
               ? "#f59e0b"
               : "#ef4444",
@@ -861,7 +861,7 @@ export default function StaffPerformancePage() {
                 <Bar
                   dataKey="replies"
                   name="Replies"
-                  fill="#3b82f6"
+                  fill="#1e8fe0"
                   radius={[4, 4, 0, 0]}
                 />
                 <Bar

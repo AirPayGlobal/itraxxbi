@@ -72,6 +72,8 @@ const DropdownMenuTrigger = React.forwardRef<
 
   const combinedRef = React.useCallback(
     (node: HTMLButtonElement | null) => {
+      // Assigning the shared trigger ref is intentional here.
+      // eslint-disable-next-line react-hooks/immutability
       (triggerRef as React.MutableRefObject<HTMLButtonElement | null>).current = node;
       if (typeof ref === "function") {
         ref(node);

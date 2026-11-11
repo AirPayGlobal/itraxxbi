@@ -8,8 +8,8 @@ import { ArrowUp, ArrowDown } from "lucide-react";
 interface KpiCardProps {
   title: string;
   value: string;
-  change: number;
-  changeLabel: string;
+  change?: number;
+  changeLabel?: string;
   icon: ReactNode;
   color: string;
   index?: number;
@@ -24,7 +24,7 @@ export function KpiCard({
   color,
   index = 0,
 }: KpiCardProps) {
-  const isPositive = change >= 0;
+  const isPositive = (change ?? 0) >= 0;
 
   return (
     <motion.div
@@ -40,24 +40,30 @@ export function KpiCard({
           <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900">
             {value}
           </p>
-          <div className="mt-3 flex items-center gap-1.5">
-            <span
-              className={cn(
-                "inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold",
-                isPositive
-                  ? "bg-emerald-50 text-emerald-700"
-                  : "bg-red-50 text-red-600"
+          {change !== undefined ? (
+            <div className="mt-3 flex items-center gap-1.5">
+              <span
+                className={cn(
+                  "inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold",
+                  isPositive
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "bg-red-50 text-red-600"
+                )}
+              >
+                {isPositive ? (
+                  <ArrowUp className="h-3 w-3" />
+                ) : (
+                  <ArrowDown className="h-3 w-3" />
+                )}
+                {Math.abs(change)}%
+              </span>
+              {changeLabel && (
+                <span className="text-xs text-slate-400">{changeLabel}</span>
               )}
-            >
-              {isPositive ? (
-                <ArrowUp className="h-3 w-3" />
-              ) : (
-                <ArrowDown className="h-3 w-3" />
-              )}
-              {Math.abs(change)}%
-            </span>
-            <span className="text-xs text-slate-400">{changeLabel}</span>
-          </div>
+            </div>
+          ) : changeLabel ? (
+            <p className="mt-3 text-xs text-slate-400">{changeLabel}</p>
+          ) : null}
         </div>
         <div
           className={cn(

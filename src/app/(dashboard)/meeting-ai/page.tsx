@@ -287,7 +287,7 @@ function AudioVisualizer({ isActive, isPaused }: { isActive: boolean; isPaused: 
 
         const gradient = ctx.createLinearGradient(x, y, x, y + h);
         if (isActive && !isPaused) {
-          gradient.addColorStop(0, "#3b82f6");
+          gradient.addColorStop(0, "#1e8fe0");
           gradient.addColorStop(0.5, "#6366f1");
           gradient.addColorStop(1, "#8b5cf6");
         } else {
@@ -1340,7 +1340,7 @@ export default function MeetingAIPage() {
               </div>
 
               {/* Stats */}
-              <div className="grid grid-cols-3 gap-4 mt-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
                 <div className="rounded-xl border border-slate-200 bg-white p-4 text-center">
                   <p className="text-2xl font-bold text-slate-800">{selectedPastMeeting.actionItemCount}</p>
                   <p className="text-xs text-slate-500 mt-1">Action Items</p>

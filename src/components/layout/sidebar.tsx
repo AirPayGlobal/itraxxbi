@@ -2,8 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/components/providers/session-provider";
+import { useCompanySettings } from "@/lib/hooks/use-company-settings";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { canAccessRoute } from "@/lib/role-access";
 import {
   Home,
   CheckSquare,
@@ -23,24 +26,34 @@ import {
   Receipt,
   UserCircle,
   MessageSquare,
+  Funnel,
+  UserCheck,
+  FolderKanban,
+  ShieldCheck,
+  ClipboardCheck,
 } from "lucide-react";
 
 const navigationItems = [
   { label: "Dashboard", href: "/", icon: Home },
+  { label: "Projects", href: "/projects", icon: FolderKanban },
   { label: "Tasks", href: "/tasks", icon: CheckSquare },
   { label: "Job Cards", href: "/jobcards", icon: Wrench },
+  { label: "Inspections", href: "/inspections", icon: ClipboardCheck },
   { label: "Tickets", href: "/tickets", icon: Ticket },
   { label: "Customers", href: "/customers", icon: Users },
+  { label: "Onboarding", href: "/customer-onboarding", icon: UserCheck },
   { label: "Staff Performance", href: "/staff", icon: BarChart },
   { label: "HR & Leave", href: "/hr", icon: Calendar },
   { label: "Payslips", href: "/payslips", icon: Receipt },
   { label: "Documents", href: "/documents", icon: FileText },
   { label: "Inventory", href: "/inventory", icon: Package },
   { label: "Finance", href: "/finance", icon: DollarSign },
+  { label: "Sales Pipeline", href: "/sales-pipeline", icon: Funnel },
   { label: "My Portal", href: "/my-portal", icon: UserCircle },
   { label: "Meeting AI", href: "/meeting-ai", icon: MessageSquare },
   { label: "TRAXX AI", href: "/traxx", icon: Bot },
   { label: "Settings", href: "/settings", icon: Settings },
+  { label: "Team & Access", href: "/settings/team", icon: ShieldCheck },
 ];
 
 interface SidebarProps {
@@ -51,30 +64,41 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle, onOpenCommand }: SidebarProps) {
   const pathname = usePathname();
+  const { profile } = useAuth();
+  const { data: companySettings } = useCompanySettings();
+  const customLogo = companySettings?.logo_url ?? null;
 
-  const isActive = (href: string) => {
-    if (href === "/") return pathname === "/";
-    return pathname.startsWith(href);
-  };
+  // Highlight only the most specific match, so /settings/team doesn't also light up Settings.
+  const activeHref = navigationItems
+    .map((item) => item.href)
+    .filter((href) => (href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`)))
+    .sort((a, b) => b.length - a.length)[0];
+  const isActive = (href: string) => href === activeHref;
+
+  const logoSrc = customLogo || "/logo-wordmark.svg";
 
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 z-40 flex h-screen flex-col bg-slate-900 text-white transition-all duration-300",
+        "fixed left-0 top-0 z-40 flex h-screen flex-col bg-ink-900 text-white transition-all duration-300",
         collapsed ? "w-16" : "w-64"
       )}
     >
       {/* Brand / Logo */}
-      <div className="flex h-16 items-center border-b border-slate-700/60 px-4">
-        <Link href="/" className="flex items-center gap-2.5 overflow-hidden">
-          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-blue-600 font-bold text-white text-sm shadow-lg shadow-blue-500/30">
-            IX
-          </div>
-          {!collapsed && (
-            <span className="whitespace-nowrap text-lg font-bold tracking-tight">
-              <span className="text-blue-400">ITRACKER</span>
-              <span className="text-white">X</span>
-            </span>
+      <div className={cn("flex items-center justify-center bg-white", collapsed ? "h-16" : "h-16")}>
+        <Link href="/" className="flex items-center overflow-hidden">
+          {collapsed ? (
+            customLogo ? (
+              <img src={customLogo} alt="Logo" className="h-9 w-9 flex-shrink-0 object-contain" />
+            ) : (
+              <img src="/logo-icon.svg" alt="iTrackerX" className="h-9 w-9 flex-shrink-0" />
+            )
+          ) : (
+            <img
+              src={logoSrc}
+              alt="iTrackerX — Fleet Data Intelligence"
+              className="h-11 w-auto flex-shrink-0"
+            />
           )}
         </Link>
       </div>
@@ -84,11 +108,11 @@ export function Sidebar({ collapsed, onToggle, onOpenCommand }: SidebarProps) {
         <div className="px-3 py-3">
           <button
             onClick={onOpenCommand}
-            className="flex w-full items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-400 transition-colors hover:border-slate-600 hover:text-slate-300"
+            className="flex w-full items-center gap-2 rounded-lg border border-ink-700 bg-ink-800 px-3 py-2 text-xs text-slate-400 transition-colors hover:border-ink-600 hover:text-slate-300"
           >
             <Search className="h-3.5 w-3.5" />
             <span className="flex-1 text-left">Quick search...</span>
-            <kbd className="rounded border border-slate-700 bg-slate-900 px-1.5 py-0.5 text-[10px]">
+            <kbd className="rounded border border-ink-700 bg-ink-900 px-1.5 py-0.5 text-[10px]">
               ⌘K
             </kbd>
           </button>
@@ -97,7 +121,7 @@ export function Sidebar({ collapsed, onToggle, onOpenCommand }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-2">
-        {navigationItems.map((item) => {
+        {navigationItems.filter((item) => profile?.role ? canAccessRoute(profile.role, item.href) : true).map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);
 
@@ -109,7 +133,7 @@ export function Sidebar({ collapsed, onToggle, onOpenCommand }: SidebarProps) {
                 "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                 active
                   ? "text-white"
-                  : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                  : "text-slate-400 hover:bg-ink-800 hover:text-white"
               )}
               title={collapsed ? item.label : undefined}
             >
@@ -117,7 +141,7 @@ export function Sidebar({ collapsed, onToggle, onOpenCommand }: SidebarProps) {
               {active && (
                 <motion.div
                   layoutId="activeNavItem"
-                  className="absolute inset-0 rounded-lg bg-blue-600"
+                  className="absolute inset-0 rounded-lg bg-linear-to-r from-brand-700 to-brand-500 shadow-sm shadow-brand-950/40"
                   transition={{ type: "spring", bounce: 0.15, duration: 0.4 }}
                 />
               )}
@@ -137,10 +161,10 @@ export function Sidebar({ collapsed, onToggle, onOpenCommand }: SidebarProps) {
       </nav>
 
       {/* Collapse Toggle */}
-      <div className="border-t border-slate-700/60 p-2">
+      <div className="border-t border-ink-700 p-2">
         <button
           onClick={onToggle}
-          className="flex w-full items-center justify-center rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
+          className="flex w-full items-center justify-center rounded-lg p-2 text-slate-400 transition-colors hover:bg-ink-800 hover:text-white"
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {collapsed ? (
