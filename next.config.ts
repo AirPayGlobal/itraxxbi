@@ -1,9 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Accounts are invite-only now; send old sign-up links to the login page.
+  // Sign-in moved to Clerk; keep old links working.
   async redirects() {
-    return [{ source: "/register", destination: "/login", permanent: true }];
+    return [
+      { source: "/login", destination: "/sign-in", permanent: true },
+      { source: "/register", destination: "/sign-up", permanent: true },
+      { source: "/forgot-password", destination: "/sign-in", permanent: true },
+      { source: "/reset-password", destination: "/sign-in", permanent: true },
+    ];
   },
 };
 

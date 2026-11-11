@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, getSignedInProfile } from "@/lib/supabase/client";
 import type { DocumentRow, DocCategory, DocAccess } from "@/lib/supabase/database.types";
 
 const supabase = createClient();
@@ -22,9 +22,7 @@ export type DocumentUploadInput = {
 };
 
 async function currentUserId(): Promise<string> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSignedInProfile();
   if (!user) throw new Error("You must be signed in.");
   return user.id;
 }

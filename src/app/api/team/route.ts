@@ -24,22 +24,20 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: (err as Error).message }, { status: 500 });
   }
 
-  const [profiles, invitations, users] = await Promise.all([
-    db.from("profiles").select("id, email, name, role, department, is_active").order("name"),
+  const [profiles, invitations] = await Promise.all([
+    db.from("profiles").select("id, email, name, role, department, is_active, clerk_user_id").order("name"),
     db.from("invitations").select("email, name, role, department"),
-    db.auth.admin.listUsers({ perPage: 1000 }),
   ]);
   if (profiles.error) return NextResponse.json({ ok: false, error: profiles.error.message }, { status: 500 });
 
-  // Someone counts as active once they've signed in at least once.
-  const signedIn = new Set((users.data?.users ?? []).filter((u) => u.last_sign_in_at).map((u) => u.id));
+  // Someone is active once their profile is linked to a Clerk account (their first sign-in).
   const members: TeamMember[] = (profiles.data ?? []).map((p) => ({
     id: p.id,
     email: p.email,
     name: p.name,
     role: p.role,
     department: p.department,
-    status: !p.is_active ? "deactivated" : signedIn.has(p.id) ? "active" : "invited",
+    status: !p.is_active ? "deactivated" : p.clerk_user_id ? "active" : "invited",
   }));
 
   const known = new Set(members.map((m) => m.email));

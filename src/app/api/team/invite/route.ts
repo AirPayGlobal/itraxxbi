@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { clerkClient } from "@clerk/nextjs/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendEmail } from "@/lib/email";
-import { ROLES, inviteEmailHtml, requireAdmin, siteOrigin, type Role } from "@/lib/team";
+import { ROLES, requireAdmin, siteOrigin, type Role } from "@/lib/team";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -11,10 +11,14 @@ function fail(error: string, status = 400) {
   return NextResponse.json({ ok: false, error }, { status });
 }
 
+function clerkError(err: unknown): string {
+  const e = err as { errors?: { longMessage?: string; message?: string }[]; message?: string };
+  return e?.errors?.[0]?.longMessage ?? e?.errors?.[0]?.message ?? e?.message ?? "Clerk couldn't send the invitation.";
+}
+
 /**
- * Invites someone (or re-sends their invite). The invitation row decides their role when the account
- * is created; the link is generated here and emailed through TransactMail, so no Supabase email
- * template changes are needed. If email isn't configured the link is returned for the admin to share.
+ * Invites someone (or re-sends their invite). Clerk emails the invitation and handles sign-up; the
+ * invitation row here decides their role when they first sign in.
  */
 export async function POST(request: NextRequest) {
   const admin = await requireAdmin();
@@ -31,14 +35,16 @@ export async function POST(request: NextRequest) {
     return fail((err as Error).message, 500);
   }
 
-  let name: string;
   let createdInvitation = false;
   if (body.resend) {
-    const { data: inv } = await db.from("invitations").select("name").eq("email", email).maybeSingle();
-    if (!inv) return fail("There's no invitation for that email.", 404);
-    name = inv.name;
+    // Pending invitations, plus people who had accounts before Clerk and haven't signed in with it yet.
+    const [{ data: inv }, { data: unlinked }] = await Promise.all([
+      db.from("invitations").select("email").eq("email", email).maybeSingle(),
+      db.from("profiles").select("id").eq("email", email).is("clerk_user_id", null).maybeSingle(),
+    ]);
+    if (!inv && !unlinked) return fail("There's no pending invitation for that email.", 404);
   } else {
-    name = body.name?.trim() ?? "";
+    const name = body.name?.trim() ?? "";
     const role = body.role as Role;
     if (!name) return fail("Name is required.");
     if (!ROLES.includes(role)) return fail("Please choose a role.");
@@ -59,27 +65,18 @@ export async function POST(request: NextRequest) {
     createdInvitation = true;
   }
 
-  // Creates the auth user (unconfirmed) on first invite; their profile picks up the invitation's role.
-  let link = await db.auth.admin.generateLink({ type: "invite", email, options: { data: { name } } });
-  if (link.error && /already|registered|exists/i.test(link.error.message)) {
-    link = await db.auth.admin.generateLink({ type: "magiclink", email });
-  }
-  if (link.error || !link.data.properties) {
-    if (createdInvitation) await db.from("invitations").delete().eq("email", email);
-    return fail(`Could not create the invite link: ${link.error?.message ?? "unknown error"}`, 502);
-  }
-
-  const { hashed_token, verification_type } = link.data.properties;
-  const url = new URL("/auth/confirm", siteOrigin(request.nextUrl.origin));
-  url.searchParams.set("token_hash", hashed_token);
-  url.searchParams.set("type", verification_type);
-  url.searchParams.set("next", "/reset-password?invite=1");
-
   try {
-    await sendEmail({ to: email, subject: "You're invited to iTrackerX BI", htmlContent: inviteEmailHtml(name, url.toString()) });
-    return NextResponse.json({ ok: true, emailed: true });
+    const clerk = await clerkClient();
+    await clerk.invitations.createInvitation({
+      emailAddress: email,
+      redirectUrl: `${siteOrigin(request.nextUrl.origin)}/sign-up`,
+      ignoreExisting: true,
+    });
   } catch (err) {
-    console.error("Invite email failed", err);
-    return NextResponse.json({ ok: true, emailed: false, link: url.toString() });
+    console.error("Clerk invitation failed", err);
+    if (createdInvitation) await db.from("invitations").delete().eq("email", email);
+    return fail(clerkError(err), 502);
   }
+
+  return NextResponse.json({ ok: true, emailed: true });
 }

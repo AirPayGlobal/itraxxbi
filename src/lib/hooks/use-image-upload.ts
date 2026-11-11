@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, getSignedInProfile } from "@/lib/supabase/client";
 
 const supabase = createClient();
 const BUCKET = "brand-assets";
@@ -29,9 +29,7 @@ export function useImageUpload(folder: ImageFolder) {
 
       setUploading(true);
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        const user = await getSignedInProfile();
         const owner = user?.id ?? "anon";
         const ext = file.name.split(".").pop()?.toLowerCase() || "png";
         const path = `${folder}/${owner}-${Date.now()}.${ext}`;

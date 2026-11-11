@@ -1,7 +1,7 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
-import type { Session, User } from "@supabase/supabase-js";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { useClerk, useUser } from "@clerk/nextjs";
 import { createClient } from "@/lib/supabase/client";
 
 export type Profile = {
@@ -17,8 +17,8 @@ export type Profile = {
 };
 
 type AuthContextValue = {
-  user: User | null;
-  session: Session | null;
+  /** `id` is the app profile id (what foreign keys use), not the Clerk user id. */
+  user: { id: string; email: string } | null;
   profile: Profile | null;
   loading: boolean;
   signOut: () => Promise<void>;
@@ -27,66 +27,40 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-export default function AuthSessionProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const supabase = createClient();
-  const [session, setSession] = useState<Session | null>(null);
+export default function AuthSessionProvider({ children }: { children: React.ReactNode }) {
+  const { isLoaded, user: clerkUser } = useUser();
+  const clerk = useClerk();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [profileLoaded, setProfileLoaded] = useState(false);
 
-  const loadProfile = useCallback(
-    async (userId: string | undefined) => {
-      if (!userId) {
-        setProfile(null);
-        return;
-      }
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, email, name, role, phone, avatar, department, job_title, is_active")
-        .eq("id", userId)
-        .single();
-      setProfile((data as Profile | null) ?? null);
-    },
-    [supabase]
-  );
+  const loadProfile = useCallback(async () => {
+    if (!clerkUser) {
+      setProfile(null);
+      setProfileLoaded(true);
+      return;
+    }
+    const { data } = await createClient()
+      .from("profiles")
+      .select("id, email, name, role, phone, avatar, department, job_title, is_active")
+      .eq("clerk_user_id", clerkUser.id)
+      .maybeSingle();
+    setProfile((data as Profile | null) ?? null);
+    setProfileLoaded(true);
+  }, [clerkUser]);
 
   useEffect(() => {
-    let active = true;
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (!active) return;
-      setSession(data.session);
-      await loadProfile(data.session?.user.id);
-      setLoading(false);
-    });
-
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
-      setSession(newSession);
-      await loadProfile(newSession?.user.id);
-    });
-
-    return () => {
-      active = false;
-      sub.subscription.unsubscribe();
-    };
-  }, [supabase, loadProfile]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- load once Clerk knows who is signed in
+    if (isLoaded) loadProfile();
+  }, [isLoaded, loadProfile]);
 
   const value: AuthContextValue = {
-    user: session?.user ?? null,
-    session,
+    user: profile ? { id: profile.id, email: clerkUser?.primaryEmailAddress?.emailAddress ?? profile.email } : null,
     profile,
-    loading,
+    loading: !isLoaded || !profileLoaded,
     signOut: async () => {
-      await supabase.auth.signOut();
-      window.location.href = "/login";
+      await clerk.signOut({ redirectUrl: "/sign-in" });
     },
-    refresh: async () => {
-      const { data } = await supabase.auth.getSession();
-      setSession(data.session);
-      await loadProfile(data.session?.user.id);
-    },
+    refresh: loadProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, getSignedInProfile } from "@/lib/supabase/client";
 import type {
   NotificationRow,
   NotificationType,
@@ -16,9 +16,7 @@ export function useNotifications() {
   return useQuery({
     queryKey: KEY,
     queryFn: async (): Promise<Notification[]> => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await getSignedInProfile();
       if (!user) return [];
       const { data, error } = await supabase
         .from("notifications")
@@ -51,9 +49,7 @@ export function useMarkAllNotificationsRead() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (): Promise<void> => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await getSignedInProfile();
       if (!user) return;
       const { error } = await supabase
         .from("notifications")

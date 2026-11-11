@@ -1,25 +1,25 @@
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import "server-only";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { auth } from "@clerk/nextjs/server";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config";
 
+/** Server-side Supabase client acting as the signed-in Clerk user, so row-level security applies. */
 export async function createClient() {
-  const cookieStore = await cookies();
+  const { getToken } = await auth();
+  return createSupabaseClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    accessToken: async () => (await getToken()) ?? null,
+  });
+}
 
-  return createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // setAll called from a Server Component — middleware refreshes the session.
-          }
-        },
-      },
-    }
-  );
+/** The signed-in person's active profile, or null if signed out, not linked, or deactivated. */
+export async function getSignedInProfile() {
+  const { userId } = await auth();
+  if (!userId) return null;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("profiles")
+    .select("id, role, job_title, is_active")
+    .eq("clerk_user_id", userId)
+    .maybeSingle();
+  return data?.is_active ? data : null;
 }

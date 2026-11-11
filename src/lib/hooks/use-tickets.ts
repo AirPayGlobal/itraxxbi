@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, getSignedInProfile } from "@/lib/supabase/client";
 import type {
   TicketRow,
   TicketCommentRow,
@@ -38,16 +38,14 @@ function ticketNumber(): string {
 }
 
 async function currentUser(): Promise<{ id: string; name: string } | null> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSignedInProfile();
   if (!user) return null;
   const { data } = await supabase
     .from("profiles")
     .select("id, name")
     .eq("id", user.id)
     .single();
-  return data ?? { id: user.id, name: user.email ?? "User" };
+  return data ?? { id: user.id, name: "User" };
 }
 
 export function useTickets() {

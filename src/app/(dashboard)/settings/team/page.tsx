@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Copy, Loader2, Mail, Send, UserPlus, Users } from "lucide-react";
+import { Loader2, Mail, Send, UserPlus, Users } from "lucide-react";
 import { cn, getInitials } from "@/lib/utils";
 import { ROLES, type Role } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/client";
@@ -35,7 +35,6 @@ export default function TeamPage() {
   const [form, setForm] = useState(EMPTY);
   const [inviting, setInviting] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null);
-  const [manualLink, setManualLink] = useState<{ email: string; link: string } | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/team");
@@ -62,18 +61,12 @@ export default function TeamPage() {
     return res.json().catch(() => ({ ok: false, error: "The server didn't respond." }));
   }
 
-  function reportInvite(email: string, json: { ok: boolean; error?: string; emailed?: boolean; link?: string }) {
+  function reportInvite(email: string, json: { ok: boolean; error?: string }) {
     if (!json.ok) {
       toast.error(json.error ?? "Could not send the invitation.");
       return false;
     }
-    if (json.emailed) {
-      toast.success(`Invitation sent to ${email}`);
-      setManualLink(null);
-    } else {
-      toast.warning("Email isn't set up, so copy the invite link below and send it yourself.");
-      setManualLink({ email, link: json.link! });
-    }
+    toast.success(`Invitation sent to ${email}`);
     return true;
   }
 
@@ -158,21 +151,6 @@ export default function TeamPage() {
           </button>
         </div>
 
-        {manualLink && (
-          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-            <span className="flex-1">
-              Send this one-time link to <strong>{manualLink.email}</strong>. It expires in 24 hours.
-            </span>
-            <button
-              type="button"
-              onClick={() => navigator.clipboard.writeText(manualLink.link).then(() => toast.success("Link copied"))}
-              className="inline-flex items-center gap-1.5 rounded-md bg-white px-3 py-1.5 text-xs font-medium text-amber-900 shadow-sm hover:bg-amber-100"
-            >
-              <Copy className="h-3.5 w-3.5" />
-              Copy link
-            </button>
-          </div>
-        )}
       </form>
 
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
