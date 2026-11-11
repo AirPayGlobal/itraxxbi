@@ -19,7 +19,10 @@ export default clerkMiddleware(async (auth, req) => {
   const profile = await resolveProfile(userId);
   if (!profile?.is_active) return NextResponse.redirect(new URL("/no-access", req.url));
   if (!canAccessRoute(profile.role, pathname)) return NextResponse.redirect(new URL("/", req.url));
-});
+},
+  // Send signed-out visitors to the app's branded pages rather than Clerk's hosted Account Portal.
+  { signInUrl: "/sign-in", signUpUrl: "/sign-up" }
+);
 
 export const config = {
   matcher: [
