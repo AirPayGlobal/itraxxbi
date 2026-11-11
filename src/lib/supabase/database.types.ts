@@ -71,6 +71,7 @@ export type ProfileRow = Timestamps & {
   department: string | null;
   job_title: string | null;
   is_active: boolean;
+  clerk_user_id: string | null;
 }
 
 export type CustomerRow = Timestamps & {
@@ -565,7 +566,7 @@ export type Database = {
       >;
     };
     Views: { [_ in never]: never };
-    Functions: { [_ in never]: never };
+    Functions: { current_profile_id: { Args: Record<string, never>; Returns: string | null } };
     Enums: {
       user_role: UserRole;
       task_status: TaskStatus;

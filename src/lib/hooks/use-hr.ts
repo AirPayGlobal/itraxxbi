@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, getSignedInProfile } from "@/lib/supabase/client";
 import { createNotification } from "@/lib/hooks/use-notifications";
 import type {
   EmployeeRow,
@@ -26,9 +26,7 @@ export type Profile = Pick<
 >;
 
 async function currentUserId(): Promise<string> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSignedInProfile();
   if (!user) throw new Error("You must be signed in.");
   return user.id;
 }

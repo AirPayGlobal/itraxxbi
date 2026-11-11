@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { Toaster } from "sonner";
+import { ClerkProvider } from "@clerk/nextjs";
 import AuthSessionProvider from "@/components/providers/session-provider";
 import QueryProvider from "@/components/providers/query-provider";
 import "./globals.css";
@@ -35,6 +36,23 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${montserrat.variable}`}>
       <body className="font-sans antialiased">
+        <ClerkProvider
+          signInUrl="/sign-in"
+          signUpUrl="/sign-up"
+          signInFallbackRedirectUrl="/"
+          signUpFallbackRedirectUrl="/"
+          afterSignOutUrl="/sign-in"
+          appearance={{
+            variables: {
+              colorPrimary: "#1676c4",
+              colorForeground: "#23272e",
+              colorBackground: "#ffffff",
+              colorBorder: "#e2e8f0",
+              fontFamily: "var(--font-inter), ui-sans-serif, system-ui, sans-serif",
+              borderRadius: "0.5rem",
+            },
+          }}
+        >
         <AuthSessionProvider>
         <QueryProvider>
         {children}
@@ -56,6 +74,7 @@ export default function RootLayout({
         />
         </QueryProvider>
         </AuthSessionProvider>
+        </ClerkProvider>
       </body>
     </html>
   );

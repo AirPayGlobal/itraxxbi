@@ -27,7 +27,7 @@ file_size_limit = "50MiB"
 [auth]
 enabled = true
 site_url = "http://localhost:3000"
-additional_redirect_urls = ["http://localhost:3000/reset-password", "http://localhost:3000/auth/confirm"]
+additional_redirect_urls = []
 jwt_expiry = 3600
 enable_signup = false
 enable_anonymous_sign_ins = false
@@ -41,3 +41,8 @@ secure_password_change = false
 [auth.email.template.recovery]
 subject = "Reset your iTraxx BI password"
 content_path = "./supabase/templates/recovery.html"
+
+# Sign-in is handled by Clerk; Supabase accepts Clerk session tokens.
+[auth.third_party.clerk]
+enabled = true
+domain = "relaxed-monitor-7909.clerk.accounts.dev"
