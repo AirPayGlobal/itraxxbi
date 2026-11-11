@@ -1,12 +1,13 @@
 # iTraxx BI
 
-Next.js 16 + Supabase business intelligence platform.
+Next.js 16 + Supabase + Clerk business intelligence platform.
 
 ## Stack
 
 - **Framework:** Next.js (App Router)
-- **Database & Auth:** Supabase (Postgres + Auth)
-- **Client:** `@supabase/supabase-js`, `@supabase/ssr` (cookie-based sessions for SSR + middleware)
+- **Sign-in:** Clerk (invite-only; sign-in, sign-up, password reset, invitations)
+- **Database & storage:** Supabase (Postgres, Storage, row-level security), accepting Clerk session tokens via [third-party auth](https://supabase.com/docs/guides/auth/third-party/clerk)
+- **Client:** `@supabase/supabase-js` with Clerk's session token as the access token
 - **UI:** Tailwind v4, Radix primitives, Lucide, Sonner
 
 ## Getting started
@@ -23,6 +24,10 @@ Set these in your host (Vercel, etc.) or in a local `.env.local` (gitignored):
 
 | Variable | Value |
 | --- | --- |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` **(required)** | Clerk → API keys (`pk_live_…` in production, `pk_test_…` for previews/local) |
+| `CLERK_SECRET_KEY` **(required, secret)** | Clerk → API keys (`sk_live_…` / `sk_test_…`) |
+| `SUPABASE_SECRET_KEY` **(required, secret)** | Supabase → Project Settings → API keys. Server-only: links Clerk accounts to profiles and powers Team & Access. (Also accepted: `SUPABASE_SERVICE_ROLE_KEY`.) |
+| `NEXT_PUBLIC_SITE_URL` *(recommended)* | Public URL used in invitation links, e.g. `https://itraxxbi.sinapsedi.com` |
 | `NEXT_PUBLIC_SUPABASE_URL` **(required)** | `https://xhmkchduceqpubqplzcg.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` **(required)** | `sb_publishable_PXepzY5a9a8FtB_c8uNl1A_AHpdwELh` |
 | `DATABASE_URL` *(server-side migrations only)* | `postgresql://postgres:[YOUR-PASSWORD]@db.xhmkchduceqpubqplzcg.supabase.co:5432/postgres` |
@@ -41,20 +46,22 @@ Set these in your host (Vercel, etc.) or in a local `.env.local` (gitignored):
   reaches the client. The key is read from `EMAIL_SERVICE` (or
   `TRANSACTMAIL_API_KEY`).
 
-### 3. Link the Supabase project (one-time)
+### 3. Connect Clerk and Supabase (one-time per environment)
+
+1. **Clerk dashboard:** enable the **Supabase** integration (adds the `role: authenticated` claim to session tokens), set sign-up mode to **Restricted**, and enable email + password.
+2. **Supabase → Authentication → Third-party auth:** add **Clerk** with your Clerk domain (production: `clerk.sinapsedi.com`; development: the `*.clerk.accounts.dev` domain from your publishable key).
+
+### 4. Apply the schema
+
+Push the migrations in `supabase/migrations/` to the linked project:
 
 ```bash
 supabase login
 supabase link --project-ref xhmkchduceqpubqplzcg
-```
-
-### 4. Apply the schema
-
-To push the migration in `supabase/migrations/` to the linked remote project:
-
-```bash
 npm run db:push        # supabase db push
 ```
+
+Without the CLI, paste `supabase/apply_all_migrations.sql` (all migrations in order) into the Supabase SQL Editor and run it once on an empty project.
 
 To reset the **local** dev database (when running `supabase start`) and re-run migrations + seed:
 
@@ -62,7 +69,18 @@ To reset the **local** dev database (when running `supabase start`) and re-run m
 npm run db:reset       # supabase db reset
 ```
 
-### 5. Run the dev server
+### 5. Invite the first administrator
+
+Access is invite-only, so the first admin is invited from outside the app:
+
+```bash
+ADMIN_EMAIL=you@company.com ADMIN_NAME="Your Name" SITE_URL=https://itraxxbi.sinapsedi.com \
+SUPABASE_URL=... SUPABASE_SECRET_KEY=... CLERK_SECRET_KEY=... npm run invite:admin
+```
+
+Or by hand: insert a row into `public.invitations` (`email`, `name`, `role = 'ADMIN'`) in the SQL Editor, then invite the same email from Clerk → Users. After accepting, the admin invites everyone else from **Team & Access** (`/settings/team`).
+
+### 6. Run the dev server
 
 ```bash
 npm run dev
@@ -72,18 +90,21 @@ Open <http://localhost:3000>.
 
 ## Auth flows
 
-All authentication runs through Supabase Auth — there is no NextAuth and no Prisma.
+Clerk handles identity; Supabase handles data. There is no Supabase Auth sign-in, NextAuth or Prisma.
 
-| Flow | File | API |
+| Flow | Where | How |
 | --- | --- | --- |
-| Sign in | `src/app/login/page.tsx` | `supabase.auth.signInWithPassword` |
-| Sign up | `src/app/register/page.tsx` | `supabase.auth.signUp` (user metadata mapped to `profiles` via trigger) |
-| Forgot password | `src/app/forgot-password/page.tsx` | `supabase.auth.resetPasswordForEmail` |
-| Reset password | `src/app/reset-password/page.tsx` | `supabase.auth.updateUser` on the recovery session |
-| Sign out | header dropdown | `supabase.auth.signOut` |
-| Route guard | `src/middleware.ts` + `src/lib/supabase/middleware.ts` | refreshes session cookies, redirects unauthenticated users to `/login` |
+| Sign in / password reset | `src/app/sign-in/[[...sign-in]]/page.tsx` | Clerk `<SignIn />` in the branded `AuthLayout` |
+| Accept an invitation | `src/app/sign-up/[[...sign-up]]/page.tsx` | Clerk `<SignUp />`; public sign-up is restricted |
+| Invite, change role, deactivate | `src/app/(dashboard)/settings/team/page.tsx`, `src/app/api/team/*` | Admin only. Invites are Clerk invitations plus a row in `public.invitations` that decides the role |
+| Route guard | `src/proxy.ts` | Clerk middleware; links the account on first sign-in (`src/lib/link-profile.ts`), applies the role page rules in `src/lib/role-access.ts`, sends unlinked or deactivated users to `/no-access` |
+| Data access | `src/lib/supabase/client.ts`, `server.ts` | Supabase clients send the Clerk session token; RLS identifies the caller by its `sub` |
 
-Client-side state is exposed via the `useAuth()` hook in `src/components/providers/session-provider.tsx`, which returns `{ user, session, profile, loading, signOut, refresh }`.
+Old URLs (`/login`, `/register`, `/forgot-password`, `/reset-password`) redirect to the Clerk pages.
+
+**Account linking:** on first sign-in, the Clerk account is matched by **verified email** to an existing profile, or else to a pending invitation (which creates the profile with the invited role). Anyone else gets "No access".
+
+Client-side state is exposed via the `useAuth()` hook in `src/components/providers/session-provider.tsx`, which returns `{ user, profile, loading, signOut, refresh }`. `user.id` is the profile id, not the Clerk user id.
 
 ## Data layer
 
@@ -129,23 +150,19 @@ inserts/updates to `never`.
 
 ## Database schema
 
-The full schema lives in `supabase/migrations/20260521000000_initial_schema.sql`. Key tables:
+The schema lives in `supabase/migrations/` (combined into `supabase/apply_all_migrations.sql`). Key tables:
 
-- `profiles` — 1:1 with `auth.users` (id, name, role, department, etc.). Auto-populated by the `on_auth_user_created` trigger from `auth.users.raw_user_meta_data`.
-- Domain tables (`projects`, `tasks`, `customers`, `vehicles`, `job_cards`, `assets`, `invoices`, `employees`, `leave_requests`, `documents`, …) reference `profiles.id` instead of a Prisma `User` table.
+- `profiles` — one per person (name, role, department, `is_active`, `clerk_user_id`). Domain tables (`projects`, `tasks`, `customers`, `vehicles`, `job_cards`, `assets`, `invoices`, `employees`, `leave_requests`, `documents`, …) reference `profiles.id`.
+- `invitations` — pending invites; the role a person gets on first sign-in comes only from here.
 
-Row Level Security is enabled on every table with a permissive `authenticated`-only default. Tighten policies in a follow-up migration as access rules solidify.
+**Row-level security** (`20261110000000_lock_down_roles.sql`, `20261111000000_clerk_auth.sql`):
 
-## Seed users (local only)
+- Callers are identified by the Clerk token's `sub` via `profiles.clerk_user_id` (`public.current_profile_id()`).
+- VIEWER is read-only; STAFF/TECHNICIAN write operational tables; MANAGER/ADMIN also write finance and HR.
+- Finance tables are readable only by ADMIN, MANAGER and VIEWER.
+- Deactivated users lose all data and document access.
+- Only admins (or server-side code) can change a profile's role, active status, email or Clerk link; signed-in users can't create profiles.
 
-`supabase/seed.sql` provisions five demo users when you `supabase db reset`:
+## Demo users (local only)
 
-| Role | Email | Password |
-| --- | --- | --- |
-| Admin | `admin@itrackerx.com` | `admin123` |
-| Manager | `manager@itrackerx.com` | `manager123` |
-| Technician | `technician@itrackerx.com` | `tech123` |
-| Staff | `staff@itrackerx.com` | `staff123` |
-| Viewer | `viewer@itrackerx.com` | `viewer123` |
-
-For the **remote** Supabase project, create demo users via the dashboard or `supabase.auth.admin.createUser` — `seed.sql` only runs against local.
+`supabase/seed.sql` creates five demo **profiles** on `supabase db reset` (`admin@`, `manager@`, `technician@`, `staff@`, `viewer@itrackerx.com`). They have no passwords: invite an email in your Clerk development instance and sign in with it to use that profile.
