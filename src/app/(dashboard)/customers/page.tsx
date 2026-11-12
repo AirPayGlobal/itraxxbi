@@ -28,6 +28,7 @@ import {
   type CustomerInput,
 } from "@/lib/hooks/use-customers";
 import type { CustomerStatus } from "@/lib/supabase/database.types";
+import { PortalAccess } from "@/components/customers/portal-access";
 
 const statusFilters = ["All", "Prospect", "Active", "Inactive", "Churned"] as const;
 
@@ -517,6 +518,8 @@ export default function CustomersPage() {
                   </p>
                 </div>
               )}
+
+              <PortalAccess key={selectedCustomer.id} customerId={selectedCustomer.id} defaultEmail={selectedCustomer.email} />
             </div>
 
             {/* Drawer Footer */}

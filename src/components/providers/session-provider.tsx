@@ -8,12 +8,14 @@ export type Profile = {
   id: string;
   email: string;
   name: string;
-  role: "ADMIN" | "MANAGER" | "TECHNICIAN" | "STAFF" | "VIEWER";
+  role: "ADMIN" | "MANAGER" | "TECHNICIAN" | "STAFF" | "VIEWER" | "CLIENT";
   phone: string | null;
   avatar: string | null;
   department: string | null;
   job_title: string | null;
   is_active: boolean;
+  /** Set for CLIENT profiles: the customer company they belong to. */
+  customer_id: string | null;
 };
 
 type AuthContextValue = {
@@ -41,7 +43,7 @@ export default function AuthSessionProvider({ children }: { children: React.Reac
     }
     const { data } = await createClient()
       .from("profiles")
-      .select("id, email, name, role, phone, avatar, department, job_title, is_active")
+      .select("id, email, name, role, phone, avatar, department, job_title, is_active, customer_id")
       .eq("clerk_user_id", clerkUser.id)
       .maybeSingle();
     setProfile((data as Profile | null) ?? null);

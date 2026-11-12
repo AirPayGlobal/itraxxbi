@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-import { canAccessRoute } from "@/lib/role-access";
+import { canAccessRoute, homeFor } from "@/lib/role-access";
 import { resolveProfile } from "@/lib/link-profile";
 
 const isPublic = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)", "/no-access"]);
@@ -18,7 +18,7 @@ export default clerkMiddleware(async (auth, req) => {
   // Pages follow the same role rules as the sidebar; the database enforces data access separately.
   const profile = await resolveProfile(userId);
   if (!profile?.is_active) return NextResponse.redirect(new URL("/no-access", req.url));
-  if (!canAccessRoute(profile.role, pathname)) return NextResponse.redirect(new URL("/", req.url));
+  if (!canAccessRoute(profile.role, pathname)) return NextResponse.redirect(new URL(homeFor(profile.role), req.url));
 },
   // Send signed-out visitors to the app's branded pages rather than Clerk's hosted Account Portal.
   { signInUrl: "/sign-in", signUpUrl: "/sign-up" }

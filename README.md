@@ -97,6 +97,7 @@ Clerk handles identity; Supabase handles data. There is no Supabase Auth sign-in
 | Sign in / password reset | `src/app/sign-in/[[...sign-in]]/page.tsx` | Clerk `<SignIn />` in the branded `AuthLayout` |
 | Accept an invitation | `src/app/sign-up/[[...sign-up]]/page.tsx` | Clerk `<SignUp />`; public sign-up is restricted |
 | Invite, change role, deactivate | `src/app/(dashboard)/settings/team/page.tsx`, `src/app/api/team/*` | Admin only. Invites are Clerk invitations plus a row in `public.invitations` that decides the role |
+| Invite customers to the client portal | Customers → customer → **Client portal**, `src/app/api/customers/[id]/portal-users` | Admin and manager. Creates a `CLIENT` invitation tied to that customer |
 | Route guard | `src/proxy.ts` | Clerk middleware; links the account on first sign-in (`src/lib/link-profile.ts`), applies the role page rules in `src/lib/role-access.ts`, sends unlinked or deactivated users to `/no-access` |
 | Data access | `src/lib/supabase/client.ts`, `server.ts` | Supabase clients send the Clerk session token; RLS identifies the caller by its `sub` |
 
@@ -155,12 +156,18 @@ The schema lives in `supabase/migrations/` (combined into `supabase/apply_all_mi
 - `profiles` — one per person (name, role, department, `is_active`, `clerk_user_id`). Domain tables (`projects`, `tasks`, `customers`, `vehicles`, `job_cards`, `assets`, `invoices`, `employees`, `leave_requests`, `documents`, …) reference `profiles.id`.
 - `invitations` — pending invites; the role a person gets on first sign-in comes only from here.
 
+**Who's who:**
+
+- **ITRACKERX staff:** `ADMIN`, `MANAGER`, `TECHNICIAN`, `STAFF`, `VIEWER`. They use the dashboard, managed in Team & Access.
+- **Clients:** `CLIENT` users belong to one customer (`profiles.customer_id`) and only see `/portal`. That covers their company's vehicles and trackers, job cards, *approved* inspections, sent invoices (with items and payments), and support tickets. They can open tickets and reply, but never see internal notes.
+
 **Row-level security** (`20261110000000_lock_down_roles.sql`, `20261111000000_clerk_auth.sql`):
 
 - Callers are identified by the Clerk token's `sub` via `profiles.clerk_user_id` (`public.current_profile_id()`).
 - VIEWER is read-only; STAFF/TECHNICIAN write operational tables; MANAGER/ADMIN also write finance and HR.
 - Finance tables are readable only by ADMIN, MANAGER and VIEWER.
 - Deactivated users lose all data and document access.
+- Clients are confined to their own customer's records (`20261112000000_client_portal.sql`); every staff policy excludes them.
 - Only admins (or server-side code) can change a profile's role, active status, email or Clerk link; signed-in users can't create profiles.
 
 ## Demo users (local only)
