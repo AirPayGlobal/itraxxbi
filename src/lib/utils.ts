@@ -5,12 +5,13 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** Namibian dollars, always written "N$" (browsers otherwise print a bare "$"). */
 export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("en-NA", {
-    style: "currency",
-    currency: "NAD",
-    currencyDisplay: "narrowSymbol",
-  }).format(amount ?? 0);
+  const value = Number(amount ?? 0);
+  const formatted = new Intl.NumberFormat("en-NA", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
+    Math.abs(value)
+  );
+  return `${value < 0 ? "-" : ""}N$${formatted}`;
 }
 
 export function formatDate(date: Date | string): string {

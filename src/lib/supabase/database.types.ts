@@ -467,6 +467,120 @@ type TableConfig<Row, Insert, Update> = {
   Relationships: [];
 };
 
+
+// ---- Tables behind the former demo pages (20261113000000_real_data.sql) ----
+type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
+
+export type PayslipStatus = "DRAFT" | "GENERATED" | "SENT" | "VIEWED";
+export type PayslipRow = Timestamps & {
+  id: string;
+  payslip_number: string;
+  user_id: string;
+  /** "YYYY-MM" */
+  period: string;
+  pay_date: string | null;
+  basic_salary: number;
+  allowances: Record<string, number>;
+  deductions: Record<string, number>;
+  total_allowances: number;
+  total_deductions: number;
+  gross_pay: number;
+  net_pay: number;
+  status: PayslipStatus;
+  sent_at: string | null;
+  viewed_at: string | null;
+  created_by_id: string | null;
+};
+
+export type DealStage = "lead" | "qualified" | "proposal" | "negotiation" | "closed_won" | "closed_lost";
+export type DealRow = Timestamps & {
+  id: string;
+  title: string;
+  company: string;
+  contact_name: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  customer_id: string | null;
+  value: number;
+  fleet_size: number | null;
+  stage: DealStage;
+  probability: number;
+  owner_id: string | null;
+  expected_close: string | null;
+  source: string | null;
+  notes: string | null;
+  escalations: Json;
+  last_activity_at: string;
+};
+
+export type OnboardingStage =
+  | "INQUIRY" | "PROPOSAL" | "CONTRACT" | "INSTALLATION" | "CONFIGURATION" | "TRAINING" | "GO_LIVE";
+export type OnboardingStatus = "IN_PROGRESS" | "COMPLETED" | "ON_HOLD" | "CANCELLED";
+export type CustomerOnboardingRow = Timestamps & {
+  id: string;
+  customer_id: string;
+  stage: OnboardingStage;
+  status: OnboardingStatus;
+  assigned_to_id: string | null;
+  vehicle_count: number | null;
+  package: string | null;
+  target_date: string | null;
+  checklist: Json;
+  notes: string | null;
+  started_at: string;
+  completed_at: string | null;
+};
+
+export type MeetingRow = Timestamps & {
+  id: string;
+  title: string;
+  meeting_date: string;
+  duration_seconds: number;
+  participants: Json;
+  transcript: Json;
+  summary: string | null;
+  key_points: Json;
+  action_items: Json;
+  created_by_id: string | null;
+};
+
+export type PerformanceKpiRow = Timestamps & {
+  id: string;
+  user_id: string;
+  period: string;
+  jobs_completed: number | null;
+  avg_response_time: number | null;
+  customer_rating: number | null;
+  tasks_completed: number | null;
+  attendance_rate: number | null;
+  punctuality_rate: number | null;
+  overall_score: number | null;
+  goals: string | null;
+  manager_notes: string | null;
+};
+
+export type TrainingRow = {
+  id: string;
+  employee_id: string;
+  name: string;
+  provider: string | null;
+  cert_number: string | null;
+  completed_date: string | null;
+  expiry_date: string | null;
+  status: string;
+  created_at: string;
+};
+
+export type ActivityLogRow = {
+  id: string;
+  user_id: string | null;
+  action: string;
+  entity: string;
+  entity_id: string | null;
+  details: string | null;
+  created_at: string;
+};
+
 // Insert helpers. id + timestamps are DB-generated (optional), and any nullable
 // column is treated as optional on insert (matches Supabase's generated types,
 // where nullable / defaulted columns may be omitted).
@@ -566,9 +680,35 @@ export type Database = {
         Insertable<VehicleInspectionRow>,
         Partial<VehicleInspectionRow>
       >;
+      payslips: TableConfig<
+        PayslipRow,
+        Partial<PayslipRow> & Pick<PayslipRow, "payslip_number" | "user_id" | "period">,
+        Partial<PayslipRow>
+      >;
+      deals: TableConfig<DealRow, Partial<DealRow> & Pick<DealRow, "title" | "company">, Partial<DealRow>>;
+      customer_onboarding: TableConfig<
+        CustomerOnboardingRow,
+        Partial<CustomerOnboardingRow> & Pick<CustomerOnboardingRow, "customer_id">,
+        Partial<CustomerOnboardingRow>
+      >;
+      meetings: TableConfig<MeetingRow, Partial<MeetingRow> & Pick<MeetingRow, "title">, Partial<MeetingRow>>;
+      performance_kpis: TableConfig<
+        PerformanceKpiRow,
+        Partial<PerformanceKpiRow> & Pick<PerformanceKpiRow, "user_id" | "period">,
+        Partial<PerformanceKpiRow>
+      >;
+      trainings: TableConfig<TrainingRow, Partial<TrainingRow> & Pick<TrainingRow, "employee_id" | "name">, Partial<TrainingRow>>;
+      activity_logs: TableConfig<
+        ActivityLogRow,
+        Partial<ActivityLogRow> & Pick<ActivityLogRow, "action" | "entity">,
+        Partial<ActivityLogRow>
+      >;
     };
     Views: { [_ in never]: never };
-    Functions: { current_profile_id: { Args: Record<string, never>; Returns: string | null } };
+    Functions: {
+      current_profile_id: { Args: Record<string, never>; Returns: string | null };
+      mark_payslip_viewed: { Args: { payslip: string }; Returns: undefined };
+    };
     Enums: {
       user_role: UserRole;
       task_status: TaskStatus;

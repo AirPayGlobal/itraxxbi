@@ -57,7 +57,7 @@ import type {
 } from "@/lib/supabase/database.types";
 
 // ---------------------------------------------------------------------------
-// Mock Data — Reports charts only (not yet wired to Supabase)
+// Constants
 // ---------------------------------------------------------------------------
 
 const EXPENSE_CATEGORIES: ExpenseCategory[] = [
@@ -81,32 +81,6 @@ const emptyExpenseForm = {
   vendor: "",
   notes: "",
 };
-
-const revenueByMonth = [
-  { month: "Sep", revenue: 35000, expenses: 28000 },
-  { month: "Oct", revenue: 38000, expenses: 30000 },
-  { month: "Nov", revenue: 42000, expenses: 32000 },
-  { month: "Dec", revenue: 45000, expenses: 35000 },
-  { month: "Jan", revenue: 48000, expenses: 38000 },
-  { month: "Feb", revenue: 50275, expenses: 41000 },
-];
-
-const invoiceStatusBreakdown = [
-  { name: "Paid", value: 3, color: "#22c55e" },
-  { name: "Sent", value: 2, color: "#1e8fe0" },
-  { name: "Draft", value: 1, color: "#94a3b8" },
-  { name: "Overdue", value: 1, color: "#ef4444" },
-  { name: "Partial", value: 1, color: "#f59e0b" },
-];
-
-const expenseByCategory = [
-  { category: "Salary", amount: 45000 },
-  { category: "Equipment", amount: 17600 },
-  { category: "Rent", amount: 8500 },
-  { category: "Insurance", amount: 4500 },
-  { category: "Fuel", amount: 2400 },
-  { category: "Marketing", amount: 1200 },
-];
 
 const statusFilters = ["All", "Draft", "Sent", "Paid", "Overdue", "Partial"] as const;
 const tabs = ["Invoices", "Expenses", "Reports"] as const;
@@ -140,6 +114,49 @@ export default function FinancePage() {
   const deleteInvoice = useDeleteInvoice();
 
   const { data: expenses = [], isLoading: expensesLoading } = useExpenses();
+
+  // Reports: derived from the real invoices and expenses.
+  const { revenueByMonth, invoiceStatusBreakdown, expenseByCategory } = useMemo(() => {
+    const now = new Date();
+    const months = Array.from({ length: 6 }, (_, k) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - 5 + k, 1);
+      return { key: `${d.getFullYear()}-${d.getMonth()}`, month: d.toLocaleString("en", { month: "short" }), revenue: 0, expenses: 0 };
+    });
+    const byKey = new Map(months.map((m) => [m.key, m]));
+    const keyOf = (date: string | null | undefined) => {
+      if (!date) return null;
+      const d = new Date(date);
+      return `${d.getFullYear()}-${d.getMonth()}`;
+    };
+    for (const inv of invoices) {
+      if (inv.status === "DRAFT" || inv.status === "CANCELLED") continue;
+      const m = byKey.get(keyOf(inv.issued_date ?? inv.created_at) ?? "");
+      if (m) m.revenue += Number(inv.total) || 0;
+    }
+    for (const e of expenses) {
+      const m = byKey.get(keyOf(e.date) ?? "");
+      if (m) m.expenses += Number(e.amount) || 0;
+    }
+
+    const statusColors: Record<string, string> = {
+      PAID: "#22c55e", SENT: "#1e8fe0", DRAFT: "#94a3b8", OVERDUE: "#ef4444", PARTIAL: "#f59e0b", CANCELLED: "#64748b",
+    };
+    const counts = new Map<string, number>();
+    for (const inv of invoices) counts.set(inv.status, (counts.get(inv.status) ?? 0) + 1);
+    const statusBreakdown = [...counts.entries()].map(([status, value]) => ({
+      name: status.charAt(0) + status.slice(1).toLowerCase(),
+      value,
+      color: statusColors[status] ?? "#94a3b8",
+    }));
+
+    const totals = new Map<string, number>();
+    for (const e of expenses) totals.set(e.category, (totals.get(e.category) ?? 0) + (Number(e.amount) || 0));
+    const byCategory = [...totals.entries()]
+      .map(([category, amount]) => ({ category: category.charAt(0) + category.slice(1).toLowerCase(), amount }))
+      .sort((a, b) => b.amount - a.amount);
+
+    return { revenueByMonth: months, invoiceStatusBreakdown: statusBreakdown, expenseByCategory: byCategory };
+  }, [invoices, expenses]);
   const createExpense = useCreateExpense();
   const setExpenseApproved = useSetExpenseApproved();
   const deleteExpense = useDeleteExpense();
@@ -802,7 +819,7 @@ export default function FinancePage() {
                     tickLine={false}
                   />
                   <YAxis
-                    tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
+                    tickFormatter={(v: number) => `N$${(v / 1000).toFixed(0)}k`}
                     tick={{ fontSize: 12, fill: "#64748b" }}
                     axisLine={{ stroke: "#e2e8f0" }}
                     tickLine={false}
@@ -845,7 +862,7 @@ export default function FinancePage() {
                     tickLine={false}
                   />
                   <YAxis
-                    tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
+                    tickFormatter={(v: number) => `N$${(v / 1000).toFixed(0)}k`}
                     tick={{ fontSize: 12, fill: "#64748b" }}
                     axisLine={{ stroke: "#e2e8f0" }}
                     tickLine={false}
@@ -920,7 +937,7 @@ export default function FinancePage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis
                     type="number"
-                    tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
+                    tickFormatter={(v: number) => `N$${(v / 1000).toFixed(0)}k`}
                     tick={{ fontSize: 12, fill: "#64748b" }}
                     axisLine={{ stroke: "#e2e8f0" }}
                     tickLine={false}

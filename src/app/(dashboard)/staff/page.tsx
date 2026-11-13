@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Users,
@@ -8,21 +8,21 @@ import {
   Clock,
   TrendingUp,
   TrendingDown,
+  Minus,
   Star,
   Trophy,
-  BarChart3,
   Search,
   Ticket,
   MessageSquare,
   CheckCircle2,
   AlertTriangle,
-  ArrowUpRight,
   Timer,
-  Shield,
-  RotateCcw,
   CircleDot,
-  ChevronDown,
-  ChevronRight,
+  ListChecks,
+  GraduationCap,
+  ClipboardCheck,
+  Loader2,
+  RefreshCw,
   X,
 } from "lucide-react";
 import {
@@ -34,114 +34,31 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
-  PieChart,
-  Pie,
-  LineChart,
-  Line,
   Legend,
 } from "recharts";
 import { cn, formatDate, formatDateTime } from "@/lib/utils";
 import {
-  getActivityLog,
-  getActivityLogForEmployee,
-  getAllEmployeeTicketMetrics,
-  subscribeToActivities,
-  type ActivityEntry,
-  type EmployeeTicketMetrics,
-} from "@/lib/activity-store";
-
-// --- Mock data (extended with ticket metrics) ---
-
-interface StaffMember {
-  id: string;
-  name: string;
-  role: string;
-  jobsCompleted: number;
-  avgResponseTime: number;
-  customerRating: number;
-  tasksCompleted: number;
-  overallScore: number;
-  trend: "up" | "down";
-}
-
-const mockStaff: StaffMember[] = [
-  {
-    id: "1",
-    name: "John Mutua",
-    role: "Senior Technician",
-    jobsCompleted: 28,
-    avgResponseTime: 1.8,
-    customerRating: 4.7,
-    tasksCompleted: 34,
-    overallScore: 92,
-    trend: "up",
-  },
-  {
-    id: "2",
-    name: "David Amupolo",
-    role: "Technician",
-    jobsCompleted: 22,
-    avgResponseTime: 2.2,
-    customerRating: 4.5,
-    tasksCompleted: 28,
-    overallScore: 85,
-    trend: "up",
-  },
-  {
-    id: "3",
-    name: "Peter Angula",
-    role: "Technician",
-    jobsCompleted: 18,
-    avgResponseTime: 2.8,
-    customerRating: 4.2,
-    tasksCompleted: 22,
-    overallScore: 74,
-    trend: "down",
-  },
-  {
-    id: "4",
-    name: "Sarah Nekongo",
-    role: "Account Manager",
-    jobsCompleted: 5,
-    avgResponseTime: 1.5,
-    customerRating: 4.8,
-    tasksCompleted: 42,
-    overallScore: 88,
-    trend: "up",
-  },
-  {
-    id: "5",
-    name: "Lisa Amupolo",
-    role: "Operations Manager",
-    jobsCompleted: 3,
-    avgResponseTime: 1.2,
-    customerRating: 4.9,
-    tasksCompleted: 38,
-    overallScore: 90,
-    trend: "up",
-  },
-  {
-    id: "6",
-    name: "David Kapere",
-    role: "Junior Technician",
-    jobsCompleted: 12,
-    avgResponseTime: 3.5,
-    customerRating: 3.8,
-    tasksCompleted: 18,
-    overallScore: 65,
-    trend: "down",
-  },
-];
+  useStaffPerformance,
+  type StaffActivity,
+  type StaffMetrics,
+} from "@/lib/hooks/use-staff-performance";
 
 // --- Helpers ---
 
 function getInitials(name: string): string {
   return name
     .split(" ")
+    .filter(Boolean)
     .map((n) => n[0])
     .join("")
     .toUpperCase()
     .slice(0, 2);
+}
+
+function shortName(name: string): string {
+  const parts = name.split(" ").filter(Boolean);
+  if (parts.length < 2) return name;
+  return `${parts[0]} ${parts[parts.length - 1][0]}.`;
 }
 
 function getScoreColor(score: number): string {
@@ -156,6 +73,17 @@ function getScoreTextColor(score: number): string {
   return "text-red-700";
 }
 
+function getScoreFill(score: number): string {
+  if (score >= 90) return "#22c55e";
+  if (score >= 80) return "#1e8fe0";
+  if (score >= 70) return "#f59e0b";
+  return "#ef4444";
+}
+
+function round1(n: number): number {
+  return Math.round(n * 10) / 10;
+}
+
 function renderStars(rating: number): React.ReactNode {
   const stars = [];
   const fullStars = Math.floor(rating);
@@ -164,48 +92,100 @@ function renderStars(rating: number): React.ReactNode {
   for (let i = 0; i < 5; i++) {
     if (i < fullStars) {
       stars.push(
-        <Star
-          key={i}
-          className="h-3.5 w-3.5 fill-amber-400 text-amber-400"
-        />
+        <Star key={i} className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
       );
     } else if (i === fullStars && hasHalf) {
       stars.push(
-        <Star
-          key={i}
-          className="h-3.5 w-3.5 fill-amber-400/50 text-amber-400"
-        />
+        <Star key={i} className="h-3.5 w-3.5 fill-amber-400/50 text-amber-400" />
       );
     } else {
-      stars.push(
-        <Star key={i} className="h-3.5 w-3.5 text-slate-200" />
-      );
+      stars.push(<Star key={i} className="h-3.5 w-3.5 text-slate-200" />);
     }
   }
   return <div className="flex items-center gap-0.5">{stars}</div>;
 }
 
-const activityTypeLabels: Record<string, string> = {
-  TICKET_CREATED: "Created ticket",
-  TICKET_ASSIGNED: "Assigned to ticket",
-  TICKET_REPLIED: "Replied to customer",
-  TICKET_RESOLVED: "Resolved ticket",
-  TICKET_CLOSED: "Closed ticket",
-  TICKET_REOPENED: "Ticket reopened",
-  TICKET_ESCALATED: "Escalated ticket",
-  TICKET_NOTE_ADDED: "Added internal note",
-};
+function ActivityIcon({ activity }: { activity: StaffActivity }) {
+  if (activity.done) return <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />;
+  switch (activity.kind) {
+    case "ticket":
+      return <Ticket className="h-3.5 w-3.5 text-blue-500" />;
+    case "job":
+      return <Briefcase className="h-3.5 w-3.5 text-purple-500" />;
+    case "task":
+      return <ListChecks className="h-3.5 w-3.5 text-sky-500" />;
+    default:
+      return <CircleDot className="h-3.5 w-3.5 text-slate-400" />;
+  }
+}
 
-const activityTypeIcons: Record<string, React.ReactNode> = {
-  TICKET_CREATED: <CircleDot className="h-3.5 w-3.5 text-blue-500" />,
-  TICKET_ASSIGNED: <ArrowUpRight className="h-3.5 w-3.5 text-purple-500" />,
-  TICKET_REPLIED: <MessageSquare className="h-3.5 w-3.5 text-sky-500" />,
-  TICKET_RESOLVED: <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />,
-  TICKET_CLOSED: <X className="h-3.5 w-3.5 text-gray-400" />,
-  TICKET_REOPENED: <RotateCcw className="h-3.5 w-3.5 text-orange-500" />,
-  TICKET_ESCALATED: <AlertTriangle className="h-3.5 w-3.5 text-red-500" />,
-  TICKET_NOTE_ADDED: <MessageSquare className="h-3.5 w-3.5 text-slate-400" />,
-};
+function TrendBadge({ delta }: { delta: number | null }) {
+  if (delta == null) return <span className="text-sm text-slate-400">—</span>;
+  if (delta > 0)
+    return (
+      <div className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
+        <TrendingUp className="h-3 w-3" />+{delta}
+      </div>
+    );
+  if (delta < 0)
+    return (
+      <div className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
+        <TrendingDown className="h-3 w-3" />
+        {delta}
+      </div>
+    );
+  return (
+    <div className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+      <Minus className="h-3 w-3" />
+      Steady
+    </div>
+  );
+}
+
+function ScoreBar({ score, width = "w-20" }: { score: number | null; width?: string }) {
+  if (score == null) return <span className="text-sm text-slate-400">—</span>;
+  const value = Math.max(0, Math.min(100, Math.round(score)));
+  return (
+    <div className="flex items-center justify-center gap-3">
+      <div className={cn("h-2 overflow-hidden rounded-full bg-slate-100", width)}>
+        <div
+          className={cn("h-full rounded-full transition-all", getScoreColor(value))}
+          style={{ width: `${value}%` }}
+        />
+      </div>
+      <span className={cn("text-sm font-semibold", getScoreTextColor(value))}>
+        {value}%
+      </span>
+    </div>
+  );
+}
+
+function MetricTile({
+  label,
+  value,
+  tone = "text-slate-700 dark:text-white",
+}: {
+  label: string;
+  value: React.ReactNode;
+  tone?: string;
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className={cn("mt-1 text-xl font-bold", tone)}>{value}</p>
+    </div>
+  );
+}
+
+function ChartEmpty({ message }: { message: string }) {
+  return (
+    <div className="flex h-[300px] items-center justify-center text-sm text-slate-400">
+      {message}
+    </div>
+  );
+}
+
+const pct = (n: number | null | undefined) => (n == null ? "—" : `${Math.round(n)}%`);
 
 // ---------------------------------------------------------------------------
 // Employee Detail Modal
@@ -213,15 +193,14 @@ const activityTypeIcons: Record<string, React.ReactNode> = {
 
 function EmployeeDetailModal({
   staff,
-  metrics,
-  activities,
   onClose,
 }: {
-  staff: StaffMember;
-  metrics: EmployeeTicketMetrics | null;
-  activities: ActivityEntry[];
+  staff: StaffMetrics;
   onClose: () => void;
 }) {
+  const kpi = staff.latestKpi;
+  const activities = staff.activities;
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -241,17 +220,21 @@ function EmployeeDetailModal({
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-700">
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-lg font-bold text-blue-700">
-              {getInitials(staff.name)}
+              {getInitials(staff.profile.name)}
             </div>
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                {staff.name}
+                {staff.profile.name}
               </h2>
-              <p className="text-sm text-slate-500">{staff.role}</p>
+              <p className="text-sm text-slate-500">
+                {staff.roleLabel}
+                {staff.profile.department ? ` · ${staff.profile.department}` : ""}
+              </p>
             </div>
           </div>
           <button
             onClick={onClose}
+            aria-label="Close"
             className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
           >
             <X className="h-5 w-5" />
@@ -259,113 +242,226 @@ function EmployeeDetailModal({
         </div>
 
         <div className="max-h-[75vh] overflow-y-auto">
-          {/* Ticket Metrics */}
-          {metrics && (
-            <div className="border-b border-slate-200 px-6 py-5 dark:border-slate-700">
-              <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
-                <Ticket className="h-4 w-4 text-blue-500" />
-                Ticket Performance Metrics
-              </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
-                  <p className="text-xs text-slate-500">Tickets Resolved</p>
-                  <p className="mt-1 text-xl font-bold text-green-600">
-                    {metrics.ticketsResolved}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
-                  <p className="text-xs text-slate-500">Total Replies</p>
-                  <p className="mt-1 text-xl font-bold text-blue-600">
-                    {metrics.totalReplies}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
-                  <p className="text-xs text-slate-500">Avg Resolution</p>
-                  <p className="mt-1 text-xl font-bold text-amber-600">
-                    {metrics.avgResolutionTimeHours}h
-                  </p>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
-                  <p className="text-xs text-slate-500">SLA Compliance</p>
-                  <p className="mt-1 text-xl font-bold text-purple-600">
-                    {metrics.slaComplianceRate}%
-                  </p>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
-                  <p className="text-xs text-slate-500">1st Response</p>
-                  <p className="mt-1 text-xl font-bold text-sky-600">
-                    {metrics.firstResponseTimeHours}h
-                  </p>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
-                  <p className="text-xs text-slate-500">Active Tickets</p>
-                  <p className="mt-1 text-xl font-bold text-slate-700 dark:text-white">
-                    {metrics.activeTickets}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
-                  <p className="text-xs text-slate-500">Escalated</p>
-                  <p className="mt-1 text-xl font-bold text-red-600">
-                    {metrics.ticketsEscalated}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
-                  <p className="text-xs text-slate-500">Reopen Rate</p>
-                  <p className="mt-1 text-xl font-bold text-orange-600">
-                    {metrics.reopenRate}%
-                  </p>
-                </div>
-              </div>
+          {/* Work metrics */}
+          <div className="border-b border-slate-200 px-6 py-5 dark:border-slate-700">
+            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
+              <ListChecks className="h-4 w-4 text-sky-500" />
+              Tasks &amp; Job Cards
+            </h3>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+              <MetricTile label="Tasks Assigned" value={staff.tasksAssigned} />
+              <MetricTile
+                label="Tasks Completed"
+                value={staff.tasksCompleted}
+                tone="text-green-600"
+              />
+              <MetricTile
+                label="Overdue Tasks"
+                value={staff.tasksOverdue}
+                tone={staff.tasksOverdue > 0 ? "text-red-600" : "text-slate-700 dark:text-white"}
+              />
+              <MetricTile
+                label="Jobs Completed"
+                value={staff.jobsCompleted}
+                tone="text-green-600"
+              />
+              <MetricTile
+                label="Jobs In Progress"
+                value={staff.jobsInProgress}
+                tone="text-purple-600"
+              />
             </div>
-          )}
+          </div>
+
+          {/* Ticket metrics */}
+          <div className="border-b border-slate-200 px-6 py-5 dark:border-slate-700">
+            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
+              <Ticket className="h-4 w-4 text-blue-500" />
+              Ticket Performance
+            </h3>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+              <MetricTile label="Tickets Assigned" value={staff.ticketsAssigned} />
+              <MetricTile
+                label="Tickets Resolved"
+                value={staff.ticketsResolved}
+                tone="text-green-600"
+              />
+              <MetricTile
+                label="Active Tickets"
+                value={staff.ticketsActive}
+                tone="text-slate-700 dark:text-white"
+              />
+              <MetricTile
+                label="Avg Resolution"
+                value={staff.avgResolutionHours != null ? `${staff.avgResolutionHours}h` : "—"}
+                tone="text-amber-600"
+              />
+              <MetricTile label="Replies" value={staff.replies} tone="text-blue-600" />
+            </div>
+          </div>
+
+          {/* Latest review */}
+          <div className="border-b border-slate-200 px-6 py-5 dark:border-slate-700">
+            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
+              <ClipboardCheck className="h-4 w-4 text-purple-500" />
+              Latest Performance Review
+              {kpi && (
+                <span className="font-mono text-xs font-normal text-slate-400">
+                  {kpi.period}
+                </span>
+              )}
+            </h3>
+            {kpi ? (
+              <>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <MetricTile
+                    label="Customer Rating"
+                    value={
+                      kpi.customer_rating != null ? (
+                        <span className="flex items-center gap-2">
+                          {round1(kpi.customer_rating)}
+                          {renderStars(kpi.customer_rating)}
+                        </span>
+                      ) : (
+                        "—"
+                      )
+                    }
+                    tone="text-amber-600"
+                  />
+                  <MetricTile
+                    label="Attendance"
+                    value={pct(kpi.attendance_rate)}
+                    tone="text-sky-600"
+                  />
+                  <MetricTile
+                    label="Punctuality"
+                    value={pct(kpi.punctuality_rate)}
+                    tone="text-sky-600"
+                  />
+                  <MetricTile
+                    label="Overall Score"
+                    value={pct(kpi.overall_score)}
+                    tone={
+                      kpi.overall_score != null
+                        ? getScoreTextColor(kpi.overall_score)
+                        : "text-slate-400"
+                    }
+                  />
+                </div>
+                {(kpi.manager_notes || kpi.goals) && (
+                  <div className="mt-3 space-y-2 text-sm text-slate-600 dark:text-slate-300">
+                    {kpi.manager_notes && (
+                      <p>
+                        <span className="font-medium text-slate-900 dark:text-white">
+                          Notes:{" "}
+                        </span>
+                        {kpi.manager_notes}
+                      </p>
+                    )}
+                    {kpi.goals && (
+                      <p>
+                        <span className="font-medium text-slate-900 dark:text-white">
+                          Goals:{" "}
+                        </span>
+                        {kpi.goals}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="py-2 text-sm text-slate-400">
+                No performance review recorded yet
+              </p>
+            )}
+          </div>
+
+          {/* Trainings */}
+          <div className="border-b border-slate-200 px-6 py-5 dark:border-slate-700">
+            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
+              <GraduationCap className="h-4 w-4 text-green-500" />
+              Training &amp; Certifications
+            </h3>
+            {staff.trainings.length > 0 ? (
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                {staff.trainings.map((t) => (
+                  <div key={t.id} className="flex items-center justify-between gap-4 py-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-slate-900 dark:text-white">
+                        {t.name}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {[
+                          t.provider,
+                          t.completed_date ? `Completed ${formatDate(t.completed_date)}` : null,
+                          t.expiry_date ? `Expires ${formatDate(t.expiry_date)}` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ") || "—"}
+                      </p>
+                    </div>
+                    <span
+                      className={cn(
+                        "shrink-0 rounded-full px-2 py-0.5 text-xs font-medium",
+                        t.status === "COMPLETED"
+                          ? "bg-green-50 text-green-700"
+                          : t.status === "EXPIRED"
+                            ? "bg-red-50 text-red-700"
+                            : t.status === "IN_PROGRESS"
+                              ? "bg-blue-50 text-blue-700"
+                              : "bg-slate-100 text-slate-600"
+                      )}
+                    >
+                      {t.status.replace(/_/g, " ").toLowerCase()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="py-2 text-sm text-slate-400">No training records yet</p>
+            )}
+          </div>
 
           {/* Activity Timeline */}
           <div className="px-6 py-5">
             <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
               <Clock className="h-4 w-4 text-slate-400" />
-              Recent Ticket Activity
+              Recent Activity
             </h3>
             {activities.length > 0 ? (
               <div className="space-y-0">
-                {activities.slice(0, 15).map((activity, idx) => (
-                  <div
-                    key={activity.id}
-                    className="relative flex gap-4 pb-4 pl-6"
-                  >
-                    {/* Timeline line */}
-                    {idx < activities.length - 1 && idx < 14 && (
+                {activities.map((activity, idx) => (
+                  <div key={activity.id} className="relative flex gap-4 pb-4 pl-6">
+                    {idx < activities.length - 1 && (
                       <div className="absolute bottom-0 left-[13px] top-6 w-px bg-slate-200 dark:bg-slate-700" />
                     )}
-                    {/* Timeline dot */}
                     <div className="absolute left-0 top-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-slate-100 dark:border-slate-900 dark:bg-slate-800">
-                      {activityTypeIcons[activity.type]}
+                      <ActivityIcon activity={activity} />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-slate-900 dark:text-white">
-                          {activityTypeLabels[activity.type]}
+                          {activity.label}
                         </span>
-                        <span className="font-mono text-xs text-blue-600 dark:text-blue-400">
-                          {activity.ticketNumber}
-                        </span>
+                        {activity.reference && (
+                          <span className="font-mono text-xs text-blue-600 dark:text-blue-400">
+                            {activity.reference}
+                          </span>
+                        )}
                       </div>
-                      <p className="mt-0.5 text-xs text-slate-500">
-                        {activity.details}
+                      {activity.detail && (
+                        <p className="mt-0.5 text-xs text-slate-500">{activity.detail}</p>
+                      )}
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        {formatDateTime(activity.at)}
                       </p>
-                      <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-400">
-                        <span>{activity.customerName}</span>
-                        <span>·</span>
-                        <span>{activity.company}</span>
-                        <span>·</span>
-                        <span>{formatDateTime(activity.timestamp)}</span>
-                      </div>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
               <p className="py-6 text-center text-sm text-slate-400">
-                No ticket activity recorded yet
+                No activity recorded yet
               </p>
             )}
           </div>
@@ -378,628 +474,569 @@ function EmployeeDetailModal({
 // --- Page ---
 
 export default function StaffPerformancePage() {
+  const { data, isLoading, isError, error, refetch, isFetching } = useStaffPerformance();
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("ALL");
-  const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
-  const [, forceUpdate] = useState(0);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // Subscribe to activity store changes
-  useEffect(() => {
-    return subscribeToActivities(() => forceUpdate((n) => n + 1));
-  }, []);
+  const staff = useMemo(() => data?.staff ?? [], [data]);
+  const activityLog = data?.activity ?? [];
 
-  const ticketMetrics = useMemo(() => getAllEmployeeTicketMetrics(), []);
-  const activityLog = useMemo(() => getActivityLog(), []);
+  const roles = useMemo(
+    () => ["ALL", ...Array.from(new Set(staff.map((s) => s.roleLabel))).sort()],
+    [staff]
+  );
 
-  const roles = ["ALL", ...Array.from(new Set(mockStaff.map((s) => s.role)))];
-
-  // Merge staff data with ticket metrics
-  const enrichedStaff = useMemo(() => {
-    return mockStaff.map((staff) => {
-      const metrics = ticketMetrics.find((m) => m.employeeId === staff.id);
-      // Adjust overall score based on ticket performance
-      let ticketBonus = 0;
-      if (metrics) {
-        // Resolved tickets add to score
-        ticketBonus += Math.min(metrics.ticketsResolved * 1.5, 8);
-        // Fast first response adds to score
-        if (metrics.firstResponseTimeHours > 0 && metrics.firstResponseTimeHours < 6) {
-          ticketBonus += 3;
-        }
-        // High SLA compliance adds to score
-        if (metrics.slaComplianceRate >= 90) ticketBonus += 2;
-        // Escalations and reopens reduce score
-        ticketBonus -= metrics.ticketsEscalated * 2;
-        ticketBonus -= metrics.reopenRate > 0 ? 3 : 0;
-      }
-      const adjustedScore = Math.min(
-        100,
-        Math.max(0, Math.round(staff.overallScore + ticketBonus))
-      );
-      return { ...staff, overallScore: adjustedScore, ticketMetrics: metrics };
-    });
-  }, [ticketMetrics]);
-
-  const filteredStaff = enrichedStaff.filter((staff) => {
-    const matchesSearch = staff.name
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-    const matchesRole = roleFilter === "ALL" || staff.role === roleFilter;
+  const filteredStaff = staff.filter((s) => {
+    const matchesSearch = s.profile.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesRole = roleFilter === "ALL" || s.roleLabel === roleFilter;
     return matchesSearch && matchesRole;
   });
 
-  const topPerformers = [...enrichedStaff]
-    .sort((a, b) => b.overallScore - a.overallScore)
-    .slice(0, 5);
+  const topPerformers = useMemo(
+    () =>
+      [...staff]
+        .filter((s) => s.completedWork > 0)
+        .sort(
+          (a, b) =>
+            b.completedWork - a.completedWork ||
+            (b.completionRate ?? 0) - (a.completionRate ?? 0)
+        )
+        .slice(0, 5),
+    [staff]
+  );
 
-  // Ticket metrics summary for overview cards
-  const ticketSummary = useMemo(() => {
-    const allMetrics = ticketMetrics;
+  const summary = useMemo(() => {
+    const samples = staff.reduce((s, m) => s + m.resolutionSamples, 0);
+    const weighted = staff.reduce(
+      (s, m) => s + (m.avgResolutionHours ?? 0) * m.resolutionSamples,
+      0
+    );
     return {
-      totalResolved: allMetrics.reduce((s, m) => s + m.ticketsResolved, 0),
-      totalReplies: allMetrics.reduce((s, m) => s + m.totalReplies, 0),
-      avgResolution:
-        allMetrics.length > 0
-          ? Math.round(
-              (allMetrics.reduce((s, m) => s + m.avgResolutionTimeHours, 0) /
-                allMetrics.filter((m) => m.avgResolutionTimeHours > 0).length) *
-                10
-            ) / 10
-          : 0,
-      avgSLA:
-        allMetrics.length > 0
-          ? Math.round(
-              allMetrics.reduce((s, m) => s + m.slaComplianceRate, 0) /
-                allMetrics.length
-            )
-          : 0,
+      totalResolved: staff.reduce((s, m) => s + m.ticketsResolved, 0),
+      avgResolution: samples > 0 ? round1(weighted / samples) : null,
+      overdueTasks: staff.reduce((s, m) => s + m.tasksOverdue, 0),
     };
-  }, [ticketMetrics]);
+  }, [staff]);
 
-  // Chart data: tickets resolved per employee
-  const ticketChartData = enrichedStaff
-    .filter((s) => s.ticketMetrics)
+  const completionChartData = staff
+    .filter((s) => s.completionRate != null)
     .map((s) => ({
-      name: s.name.split(" ")[0] + " " + s.name.split(" ")[1]?.[0] + ".",
-      resolved: s.ticketMetrics!.ticketsResolved,
-      replies: s.ticketMetrics!.totalReplies,
-      escalated: s.ticketMetrics!.ticketsEscalated,
-    }))
-    .sort((a, b) => b.resolved - a.resolved);
-
-  const teamPerformanceData = enrichedStaff
-    .map((s) => ({
-      name: s.name.split(" ")[0] + " " + s.name.split(" ")[1]?.[0] + ".",
-      score: s.overallScore,
-      fill:
-        s.overallScore >= 90
-          ? "#22c55e"
-          : s.overallScore >= 80
-            ? "#1e8fe0"
-            : s.overallScore >= 70
-              ? "#f59e0b"
-              : "#ef4444",
+      name: shortName(s.profile.name),
+      score: s.completionRate as number,
+      fill: getScoreFill(s.completionRate as number),
     }))
     .sort((a, b) => b.score - a.score);
 
-  const selectedMetrics = selectedStaff
-    ? ticketMetrics.find((m) => m.employeeId === selectedStaff.id) || null
+  const ticketChartData = staff
+    .filter((s) => s.ticketsAssigned > 0 || s.replies > 0)
+    .map((s) => ({
+      name: shortName(s.profile.name),
+      resolved: s.ticketsResolved,
+      replies: s.replies,
+      active: s.ticketsActive,
+    }))
+    .sort((a, b) => b.resolved - a.resolved);
+
+  const selectedStaff = selectedId
+    ? staff.find((s) => s.profile.id === selectedId) ?? null
     : null;
-  const selectedActivities = selectedStaff
-    ? getActivityLogForEmployee(selectedStaff.id)
-    : [];
+
+  // --- Loading / error / empty ---
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+        <div className="flex items-center gap-3 text-sm text-slate-500">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          Loading staff performance…
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+        <div className="max-w-md rounded-lg border border-red-200 bg-white p-6 text-center shadow-sm">
+          <AlertTriangle className="mx-auto h-8 w-8 text-red-500" />
+          <h2 className="mt-3 text-base font-semibold text-slate-900">
+            Couldn&apos;t load staff performance
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            {(error as Error)?.message || "Something went wrong."}
+          </p>
+          <button
+            onClick={() => refetch()}
+            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 p-6 lg:p-8">
       {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-900">
-          Staff Performance
-        </h1>
+        <h1 className="text-2xl font-bold text-slate-900">Staff Performance</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Track team performance metrics including ticket activity and response
-          times
+          Task, job card and ticket output per team member, plus their latest review
         </p>
       </div>
 
-      {/* Overview Stats Row */}
-      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-100">
-              <Users className="h-5 w-5 text-blue-600" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-slate-500">Total Staff</p>
-              <p className="mt-1 text-2xl font-bold text-slate-900">
-                {mockStaff.length}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-green-100">
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-slate-500">
-                Tickets Resolved
-              </p>
-              <p className="mt-1 text-2xl font-bold text-slate-900">
-                {ticketSummary.totalResolved}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100">
-              <Timer className="h-5 w-5 text-amber-600" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-slate-500">
-                Avg Resolution Time
-              </p>
-              <p className="mt-1 text-2xl font-bold text-slate-900">
-                {ticketSummary.avgResolution}h
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-purple-100">
-              <Shield className="h-5 w-5 text-purple-600" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-slate-500">
-                Avg SLA Compliance
-              </p>
-              <p className="mt-1 text-2xl font-bold text-slate-900">
-                {ticketSummary.avgSLA}%
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Search and Filters */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search staff..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-10 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
-        </div>
-        <select
-          value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value)}
-          className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-        >
-          {roles.map((role) => (
-            <option key={role} value={role}>
-              {role === "ALL" ? "All Roles" : role}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Staff Performance Table (with ticket columns) */}
-      <div className="mb-8 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 px-6 py-4">
-          <h3 className="text-lg font-semibold text-slate-900">
-            Staff Performance Overview
-          </h3>
-          <p className="mt-0.5 text-xs text-slate-500">
-            Click any row to view detailed ticket activity and performance breakdown
+      {staff.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
+          <Users className="mx-auto h-10 w-10 text-slate-300" />
+          <h2 className="mt-3 text-base font-semibold text-slate-900">
+            No staff data yet
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Active staff profiles will appear here once they are added. Their
+            performance is calculated from assigned tasks, job cards and tickets.
           </p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-slate-100 bg-slate-50">
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                  Staff Member
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-                  Role
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
-                  Jobs
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
-                  <span className="flex items-center justify-center gap-1">
-                    <Ticket className="h-3 w-3" />
-                    Resolved
-                  </span>
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
-                  <span className="flex items-center justify-center gap-1">
-                    <MessageSquare className="h-3 w-3" />
-                    Replies
-                  </span>
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
-                  <span className="flex items-center justify-center gap-1">
-                    <Timer className="h-3 w-3" />
-                    Avg Resolve
-                  </span>
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
-                  <span className="flex items-center justify-center gap-1">
-                    <Shield className="h-3 w-3" />
-                    SLA %
-                  </span>
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
-                  Customer Rating
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
-                  Overall Score
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
-                  Trend
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredStaff.map((staff) => {
-                const metrics = staff.ticketMetrics;
-                return (
-                  <tr
-                    key={staff.id}
-                    className="cursor-pointer transition-colors hover:bg-blue-50/50"
-                    onClick={() => setSelectedStaff(staff)}
-                  >
-                    <td className="whitespace-nowrap px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-medium text-blue-700">
-                          {getInitials(staff.name)}
-                        </div>
-                        <span className="text-sm font-medium text-slate-900">
-                          {staff.name}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-600">
-                      {staff.role}
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-center text-sm font-medium text-slate-900">
-                      {staff.jobsCompleted}
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-center">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">
-                        <CheckCircle2 className="h-3 w-3" />
-                        {metrics?.ticketsResolved ?? 0}
-                      </span>
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-center">
-                      <span className="text-sm font-medium text-slate-700">
-                        {metrics?.totalReplies ?? 0}
-                      </span>
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-center text-sm text-slate-600">
-                      {metrics?.avgResolutionTimeHours
-                        ? `${metrics.avgResolutionTimeHours}h`
-                        : "—"}
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-center">
-                      {metrics ? (
-                        <span
-                          className={cn(
-                            "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold",
-                            metrics.slaComplianceRate >= 90
-                              ? "bg-green-50 text-green-700"
-                              : metrics.slaComplianceRate >= 70
-                                ? "bg-yellow-50 text-yellow-700"
-                                : "bg-red-50 text-red-700"
-                          )}
-                        >
-                          {metrics.slaComplianceRate}%
-                        </span>
-                      ) : (
-                        <span className="text-sm text-slate-400">—</span>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4">
-                      <div className="flex items-center justify-center gap-2">
-                        {renderStars(staff.customerRating)}
-                        <span className="text-xs text-slate-500">
-                          {staff.customerRating}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4">
-                      <div className="flex items-center justify-center gap-3">
-                        <div className="h-2 w-20 overflow-hidden rounded-full bg-slate-100">
-                          <div
-                            className={cn(
-                              "h-full rounded-full transition-all",
-                              getScoreColor(staff.overallScore)
-                            )}
-                            style={{ width: `${staff.overallScore}%` }}
-                          />
-                        </div>
-                        <span
-                          className={cn(
-                            "text-sm font-semibold",
-                            getScoreTextColor(staff.overallScore)
-                          )}
-                        >
-                          {staff.overallScore}%
-                        </span>
-                      </div>
-                    </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-center">
-                      {staff.trend === "up" ? (
-                        <div className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
-                          <TrendingUp className="h-3 w-3" />
-                          Up
-                        </div>
-                      ) : (
-                        <div className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
-                          <TrendingDown className="h-3 w-3" />
-                          Down
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-              {filteredStaff.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={10}
-                    className="px-6 py-12 text-center text-sm text-slate-500"
-                  >
-                    No staff members found matching your criteria.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Charts Row */}
-      <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Team Performance Bar Chart */}
-        <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-6 py-4">
-            <h3 className="text-lg font-semibold text-slate-900">
-              Overall Performance Score
-            </h3>
-            <p className="text-xs text-slate-500">
-              Includes job, task, and ticket performance
-            </p>
-          </div>
-          <div className="p-6">
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={teamPerformanceData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis
-                  dataKey="name"
-                  tick={{ fontSize: 12, fill: "#64748b" }}
-                  axisLine={{ stroke: "#e2e8f0" }}
-                  tickLine={false}
-                />
-                <YAxis
-                  domain={[0, 100]}
-                  tick={{ fontSize: 12, fill: "#64748b" }}
-                  axisLine={{ stroke: "#e2e8f0" }}
-                  tickLine={false}
-                  tickFormatter={(value: number) => `${value}%`}
-                />
-                <Tooltip
-                  formatter={(value) =>
-                    [`${value ?? 0}%`, "Score"] as [string, string]
-                  }
-                  contentStyle={{
-                    borderRadius: "8px",
-                    border: "1px solid #e2e8f0",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-                  }}
-                />
-                <Bar dataKey="score" radius={[4, 4, 0, 0]}>
-                  {teamPerformanceData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Ticket Activity Chart */}
-        <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-6 py-4">
-            <h3 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
-              <Ticket className="h-5 w-5 text-blue-500" />
-              Ticket Performance by Staff
-            </h3>
-            <p className="text-xs text-slate-500">
-              Resolved tickets, replies, and escalations
-            </p>
-          </div>
-          <div className="p-6">
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={ticketChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis
-                  dataKey="name"
-                  tick={{ fontSize: 12, fill: "#64748b" }}
-                  axisLine={{ stroke: "#e2e8f0" }}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 12, fill: "#64748b" }}
-                  axisLine={{ stroke: "#e2e8f0" }}
-                  tickLine={false}
-                />
-                <Tooltip
-                  contentStyle={{
-                    borderRadius: "8px",
-                    border: "1px solid #e2e8f0",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-                  }}
-                />
-                <Legend />
-                <Bar
-                  dataKey="resolved"
-                  name="Resolved"
-                  fill="#22c55e"
-                  radius={[4, 4, 0, 0]}
-                />
-                <Bar
-                  dataKey="replies"
-                  name="Replies"
-                  fill="#1e8fe0"
-                  radius={[4, 4, 0, 0]}
-                />
-                <Bar
-                  dataKey="escalated"
-                  name="Escalated"
-                  fill="#ef4444"
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom Row: Leaderboard + Recent Activity */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Leaderboard */}
-        <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-6 py-4">
-            <div className="flex items-center gap-2">
-              <Trophy className="h-5 w-5 text-amber-500" />
-              <h3 className="text-lg font-semibold text-slate-900">
-                Top 5 Performers
-              </h3>
-            </div>
-          </div>
-          <div className="divide-y divide-slate-100">
-            {topPerformers.map((staff, index) => {
-              const metrics = ticketMetrics.find(
-                (m) => m.employeeId === staff.id
-              );
-              return (
-                <div
-                  key={staff.id}
-                  className="flex items-center gap-4 px-6 py-4"
-                >
-                  <div
-                    className={cn(
-                      "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold",
-                      index === 0
-                        ? "bg-amber-100 text-amber-700"
-                        : index === 1
-                          ? "bg-slate-200 text-slate-600"
-                          : index === 2
-                            ? "bg-orange-100 text-orange-700"
-                            : "bg-slate-50 text-slate-500"
-                    )}
-                  >
-                    {index + 1}
-                  </div>
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-medium text-blue-700">
-                    {getInitials(staff.name)}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-slate-900">
-                      {staff.name}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {staff.role}
-                      {metrics && metrics.ticketsResolved > 0 && (
-                        <span className="ml-2 text-green-600">
-                          · {metrics.ticketsResolved} tickets resolved
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="h-2 w-16 overflow-hidden rounded-full bg-slate-100">
-                      <div
-                        className={cn(
-                          "h-full rounded-full",
-                          getScoreColor(staff.overallScore)
-                        )}
-                        style={{ width: `${staff.overallScore}%` }}
-                      />
-                    </div>
-                    <span
-                      className={cn(
-                        "text-sm font-bold",
-                        getScoreTextColor(staff.overallScore)
-                      )}
-                    >
-                      {staff.overallScore}%
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Recent Activity Feed */}
-        <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-6 py-4">
-            <div className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-slate-400" />
-              <h3 className="text-lg font-semibold text-slate-900">
-                Recent Ticket Activity
-              </h3>
-            </div>
-          </div>
-          <div className="divide-y divide-slate-100">
-            {activityLog.slice(0, 8).map((activity) => (
-              <div
-                key={activity.id}
-                className="flex items-start gap-3 px-6 py-3"
-              >
-                <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100">
-                  {activityTypeIcons[activity.type]}
+      ) : (
+        <>
+          {/* Overview Stats Row */}
+          <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-100">
+                  <Users className="h-5 w-5 text-blue-600" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm text-slate-900">
-                    <span className="font-medium">{activity.employeeName}</span>{" "}
-                    <span className="text-slate-500">
-                      {activityTypeLabels[activity.type].toLowerCase()}
-                    </span>{" "}
-                    <span className="font-mono text-xs text-blue-600">
-                      {activity.ticketNumber}
-                    </span>
-                  </p>
-                  <p className="mt-0.5 text-xs text-slate-400">
-                    {activity.customerName} · {formatDateTime(activity.timestamp)}
+                  <p className="text-sm font-medium text-slate-500">Total Staff</p>
+                  <p className="mt-1 text-2xl font-bold text-slate-900">{staff.length}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-green-100">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-slate-500">Tickets Resolved</p>
+                  <p className="mt-1 text-2xl font-bold text-slate-900">
+                    {summary.totalResolved}
                   </p>
                 </div>
               </div>
-            ))}
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100">
+                  <Timer className="h-5 w-5 text-amber-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-slate-500">Avg Resolution Time</p>
+                  <p className="mt-1 text-2xl font-bold text-slate-900">
+                    {summary.avgResolution != null ? `${summary.avgResolution}h` : "—"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-100">
+                  <AlertTriangle className="h-5 w-5 text-red-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-slate-500">Overdue Tasks</p>
+                  <p className="mt-1 text-2xl font-bold text-slate-900">
+                    {summary.overdueTasks}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+
+          {/* Search and Filters */}
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search staff..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-10 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              {roles.map((role) => (
+                <option key={role} value={role}>
+                  {role === "ALL" ? "All Roles" : role}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Staff Performance Table */}
+          <div className="mb-8 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-200 px-6 py-4">
+              <h3 className="text-lg font-semibold text-slate-900">
+                Staff Performance Overview
+              </h3>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Click any row to view work breakdown, latest review, training and activity
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50">
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Staff Member
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Role
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
+                      <span className="flex items-center justify-center gap-1">
+                        <ListChecks className="h-3 w-3" />
+                        Tasks
+                      </span>
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
+                      <span className="flex items-center justify-center gap-1">
+                        <Briefcase className="h-3 w-3" />
+                        Jobs
+                      </span>
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
+                      <span className="flex items-center justify-center gap-1">
+                        <Ticket className="h-3 w-3" />
+                        Resolved
+                      </span>
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
+                      <span className="flex items-center justify-center gap-1">
+                        <MessageSquare className="h-3 w-3" />
+                        Replies
+                      </span>
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
+                      <span className="flex items-center justify-center gap-1">
+                        <Timer className="h-3 w-3" />
+                        Avg Resolve
+                      </span>
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Customer Rating
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Review Score
+                    </th>
+                    <th className="px-6 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
+                      Trend
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredStaff.map((s) => {
+                    const rating = s.latestKpi?.customer_rating ?? null;
+                    return (
+                      <tr
+                        key={s.profile.id}
+                        className="cursor-pointer transition-colors hover:bg-blue-50/50"
+                        onClick={() => setSelectedId(s.profile.id)}
+                      >
+                        <td className="whitespace-nowrap px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-medium text-blue-700">
+                              {getInitials(s.profile.name)}
+                            </div>
+                            <span className="text-sm font-medium text-slate-900">
+                              {s.profile.name}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4 text-sm text-slate-600">
+                          {s.roleLabel}
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4 text-center text-sm">
+                          <span className="font-medium text-slate-900">
+                            {s.tasksCompleted}/{s.tasksAssigned}
+                          </span>
+                          {s.tasksOverdue > 0 && (
+                            <span className="ml-2 inline-flex items-center gap-0.5 rounded-full bg-red-50 px-1.5 py-0.5 text-[11px] font-semibold text-red-700">
+                              <AlertTriangle className="h-3 w-3" />
+                              {s.tasksOverdue}
+                            </span>
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4 text-center text-sm">
+                          <span className="font-medium text-slate-900">{s.jobsCompleted}</span>
+                          {s.jobsInProgress > 0 && (
+                            <span className="ml-1 text-xs text-slate-500">
+                              (+{s.jobsInProgress} active)
+                            </span>
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4 text-center">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">
+                            <CheckCircle2 className="h-3 w-3" />
+                            {s.ticketsResolved}/{s.ticketsAssigned}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4 text-center">
+                          <span className="text-sm font-medium text-slate-700">{s.replies}</span>
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4 text-center text-sm text-slate-600">
+                          {s.avgResolutionHours != null ? `${s.avgResolutionHours}h` : "—"}
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4">
+                          {rating != null ? (
+                            <div className="flex items-center justify-center gap-2">
+                              {renderStars(rating)}
+                              <span className="text-xs text-slate-500">{round1(rating)}</span>
+                            </div>
+                          ) : (
+                            <div className="text-center text-sm text-slate-400">—</div>
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4">
+                          <ScoreBar score={s.latestKpi?.overall_score ?? null} />
+                        </td>
+                        <td className="whitespace-nowrap px-6 py-4 text-center">
+                          <TrendBadge delta={s.scoreDelta} />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {filteredStaff.length === 0 && (
+                    <tr>
+                      <td colSpan={10} className="px-6 py-12 text-center text-sm text-slate-500">
+                        No staff members found matching your criteria.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Charts Row */}
+          <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {/* Completion Rate Bar Chart */}
+            <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-200 px-6 py-4">
+                <h3 className="text-lg font-semibold text-slate-900">Completion Rate</h3>
+                <p className="text-xs text-slate-500">
+                  Completed tasks, job cards and resolved tickets as a share of everything
+                  assigned
+                </p>
+              </div>
+              <div className="p-6">
+                {completionChartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={completionChartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis
+                        dataKey="name"
+                        tick={{ fontSize: 12, fill: "#64748b" }}
+                        axisLine={{ stroke: "#e2e8f0" }}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        domain={[0, 100]}
+                        tick={{ fontSize: 12, fill: "#64748b" }}
+                        axisLine={{ stroke: "#e2e8f0" }}
+                        tickLine={false}
+                        tickFormatter={(value: number) => `${value}%`}
+                      />
+                      <Tooltip
+                        formatter={(value) =>
+                          [`${value ?? 0}%`, "Completion"] as [string, string]
+                        }
+                        contentStyle={{
+                          borderRadius: "8px",
+                          border: "1px solid #e2e8f0",
+                          boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                        }}
+                      />
+                      <Bar dataKey="score" radius={[4, 4, 0, 0]}>
+                        {completionChartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <ChartEmpty message="No assigned work yet" />
+                )}
+              </div>
+            </div>
+
+            {/* Ticket Activity Chart */}
+            <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-200 px-6 py-4">
+                <h3 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+                  <Ticket className="h-5 w-5 text-blue-500" />
+                  Ticket Performance by Staff
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Resolved tickets, customer replies, and tickets still open
+                </p>
+              </div>
+              <div className="p-6">
+                {ticketChartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={ticketChartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis
+                        dataKey="name"
+                        tick={{ fontSize: 12, fill: "#64748b" }}
+                        axisLine={{ stroke: "#e2e8f0" }}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        allowDecimals={false}
+                        tick={{ fontSize: 12, fill: "#64748b" }}
+                        axisLine={{ stroke: "#e2e8f0" }}
+                        tickLine={false}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          borderRadius: "8px",
+                          border: "1px solid #e2e8f0",
+                          boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                        }}
+                      />
+                      <Legend />
+                      <Bar dataKey="resolved" name="Resolved" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="replies" name="Replies" fill="#1e8fe0" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="active" name="Open" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <ChartEmpty message="No ticket data yet" />
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Row: Leaderboard + Recent Activity */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {/* Leaderboard */}
+            <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-200 px-6 py-4">
+                <div className="flex items-center gap-2">
+                  <Trophy className="h-5 w-5 text-amber-500" />
+                  <h3 className="text-lg font-semibold text-slate-900">Top 5 Performers</h3>
+                </div>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Ranked by completed tasks, job cards and resolved tickets
+                </p>
+              </div>
+              {topPerformers.length > 0 ? (
+                <div className="divide-y divide-slate-100">
+                  {topPerformers.map((s, index) => (
+                    <div
+                      key={s.profile.id}
+                      className="flex cursor-pointer items-center gap-4 px-6 py-4 hover:bg-blue-50/50"
+                      onClick={() => setSelectedId(s.profile.id)}
+                    >
+                      <div
+                        className={cn(
+                          "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold",
+                          index === 0
+                            ? "bg-amber-100 text-amber-700"
+                            : index === 1
+                              ? "bg-slate-200 text-slate-600"
+                              : index === 2
+                                ? "bg-orange-100 text-orange-700"
+                                : "bg-slate-50 text-slate-500"
+                        )}
+                      >
+                        {index + 1}
+                      </div>
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-medium text-blue-700">
+                        {getInitials(s.profile.name)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-slate-900">{s.profile.name}</p>
+                        <p className="text-xs text-slate-500">
+                          {s.roleLabel}
+                          <span className="ml-2 text-green-600">
+                            · {s.completedWork} completed
+                          </span>
+                        </p>
+                      </div>
+                      <ScoreBar score={s.completionRate} width="w-16" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="px-6 py-12 text-center text-sm text-slate-400">
+                  No completed work recorded yet
+                </p>
+              )}
+            </div>
+
+            {/* Recent Activity Feed */}
+            <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-200 px-6 py-4">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-slate-400" />
+                  <h3 className="text-lg font-semibold text-slate-900">Recent Activity</h3>
+                </div>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {data?.activitySource === "activity_logs"
+                    ? "From the activity log"
+                    : "Latest task, job card and ticket updates"}
+                </p>
+              </div>
+              {activityLog.length > 0 ? (
+                <div className="divide-y divide-slate-100">
+                  {activityLog.slice(0, 8).map((activity) => (
+                    <div key={activity.id} className="flex items-start gap-3 px-6 py-3">
+                      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100">
+                        <ActivityIcon activity={activity} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-slate-900">
+                          <span className="font-medium">{activity.actorName}</span>{" "}
+                          <span className="text-slate-500">{activity.label.toLowerCase()}</span>{" "}
+                          {activity.reference && (
+                            <span className="font-mono text-xs text-blue-600">
+                              {activity.reference}
+                            </span>
+                          )}
+                        </p>
+                        <p className="mt-0.5 truncate text-xs text-slate-400">
+                          {activity.detail ? `${activity.detail} · ` : ""}
+                          {formatDateTime(activity.at)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="px-6 py-12 text-center text-sm text-slate-400">
+                  No activity recorded yet
+                </p>
+              )}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Employee Detail Modal */}
       {selectedStaff && (
-        <EmployeeDetailModal
-          staff={selectedStaff}
-          metrics={selectedMetrics}
-          activities={selectedActivities}
-          onClose={() => setSelectedStaff(null)}
-        />
+        <EmployeeDetailModal staff={selectedStaff} onClose={() => setSelectedId(null)} />
       )}
     </div>
   );
