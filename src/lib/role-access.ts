@@ -21,7 +21,13 @@ export const roleAccess: Record<string, string[]> = {
   VIEWER: [
     "/", "/projects", "/tasks", "/jobcards", "/customers", "/finance",
   ],
+  CLIENT: ["/portal"],
 };
+
+/** Where someone lands after signing in, and where they're sent from pages their role can't open. */
+export function homeFor(role: string): string {
+  return role === "CLIENT" ? "/portal" : "/";
+}
 
 export function canAccessRoute(role: string, path: string): boolean {
   const allowed = roleAccess[role];

@@ -49,8 +49,15 @@ export async function POST(request: NextRequest) {
     if (!name) return fail("Name is required.");
     if (!ROLES.includes(role)) return fail("Please choose a role.");
 
-    const { data: existing } = await db.from("profiles").select("id").eq("email", email).maybeSingle();
-    if (existing) return fail("Someone with that email is already on the team.", 409);
+    const { data: existing } = await db.from("profiles").select("id, role").eq("email", email).maybeSingle();
+    if (existing) {
+      return fail(
+        existing.role === "CLIENT"
+          ? "That email belongs to a client portal user."
+          : "Someone with that email is already on the team.",
+        409
+      );
+    }
 
     const { error } = await db.from("invitations").upsert({
       email,
@@ -60,6 +67,7 @@ export async function POST(request: NextRequest) {
       job_title: body.jobTitle?.trim() || null,
       invited_by: admin.id,
       accepted_at: null,
+      customer_id: null,
     });
     if (error) return fail(`Could not save the invitation: ${error.message}`, 500);
     createdInvitation = true;

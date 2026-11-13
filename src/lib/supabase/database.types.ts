@@ -4,7 +4,7 @@
 // Until every module is wired, this covers: profiles, customers, projects,
 // tasks, job_cards, invoices, invoice_items, payments, tickets, ticket_comments.
 
-export type UserRole = "ADMIN" | "MANAGER" | "TECHNICIAN" | "STAFF" | "VIEWER";
+export type UserRole = "ADMIN" | "MANAGER" | "TECHNICIAN" | "STAFF" | "VIEWER" | "CLIENT";
 export type TaskStatus = "TODO" | "IN_PROGRESS" | "REVIEW" | "DONE" | "CANCELLED";
 export type ProjectStatus =
   | "PLANNING"
@@ -72,6 +72,8 @@ export type ProfileRow = Timestamps & {
   job_title: string | null;
   is_active: boolean;
   clerk_user_id: string | null;
+  /** Set for CLIENT profiles: the customer company they belong to. */
+  customer_id: string | null;
 }
 
 export type CustomerRow = Timestamps & {

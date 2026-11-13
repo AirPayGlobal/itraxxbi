@@ -52,6 +52,7 @@ export async function resolveProfile(clerkUserId: string): Promise<LinkedProfile
       job_title: invite.job_title,
       is_active: true,
       clerk_user_id: clerkUserId,
+      customer_id: invite.customer_id ?? null,
     })
     .select("id, role, is_active")
     .single();

@@ -9,6 +9,12 @@ export async function requireAdmin() {
   return profile?.role === "ADMIN" ? { id: profile.id } : null;
 }
 
+/** The signed-in person's profile if they are an active ADMIN or MANAGER, otherwise null. */
+export async function requireManager() {
+  const profile = await getSignedInProfile();
+  return profile?.role === "ADMIN" || profile?.role === "MANAGER" ? { id: profile.id } : null;
+}
+
 export function siteOrigin(requestOrigin: string) {
   return (process.env.NEXT_PUBLIC_SITE_URL || requestOrigin).replace(/\/$/, "");
 }
