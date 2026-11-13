@@ -51,6 +51,8 @@ export default function RootLayout({
               fontFamily: "var(--font-inter), ui-sans-serif, system-ui, sans-serif",
               borderRadius: "0.5rem",
             },
+            // Email and password only: no Google or other social sign-in buttons anywhere.
+            elements: { socialButtonsRoot: "hidden", socialButtons: "hidden", dividerRow: "hidden" },
           }}
         >
         <AuthSessionProvider>
