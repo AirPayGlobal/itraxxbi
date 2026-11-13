@@ -167,11 +167,16 @@ export type InvoiceItemRow = {
 
 export type PaymentRow = {
   id: string;
-  invoice_id: string;
+  /** Null for payments imported from a bank statement that aren't matched to an invoice yet. */
+  invoice_id: string | null;
+  customer_id: string | null;
+  payer_name: string | null;
   amount: number;
   method: PaymentMethod;
   reference: string | null;
+  notes: string | null;
   paid_at: string;
+  created_at: string;
 }
 
 export type TicketRow = Timestamps & {
@@ -581,6 +586,44 @@ export type ActivityLogRow = {
   created_at: string;
 };
 
+// ---- Data uploads (20261114000000_data_uploads.sql) ----
+export type RecordFileArea = "payslip" | "deal" | "payment" | "debtors";
+export type RecordFileRow = {
+  id: string;
+  area: RecordFileArea;
+  entity_id: string;
+  /** Storage path in the private "records" bucket: <area>/<entity_id>/<file>. */
+  path: string;
+  file_name: string;
+  file_size: number | null;
+  mime_type: string | null;
+  uploaded_by_id: string | null;
+  created_at: string;
+};
+
+export type DebtorAgeReportRow = {
+  id: string;
+  as_of: string;
+  file_name: string | null;
+  notes: string | null;
+  uploaded_by_id: string | null;
+  created_at: string;
+};
+
+export type DebtorAgeLineRow = {
+  id: string;
+  report_id: string;
+  customer_id: string | null;
+  account_number: string | null;
+  customer_name: string;
+  current_amount: number;
+  days_30: number;
+  days_60: number;
+  days_90: number;
+  days_120_plus: number;
+  total: number;
+};
+
 // Insert helpers. id + timestamps are DB-generated (optional), and any nullable
 // column is treated as optional on insert (matches Supabase's generated types,
 // where nullable / defaulted columns may be omitted).
@@ -625,7 +668,7 @@ export type Database = {
       >;
       payments: TableConfig<
         PaymentRow,
-        Omit<PaymentRow, "id" | "paid_at"> & { paid_at?: string },
+        Partial<PaymentRow> & Pick<PaymentRow, "amount" | "method">,
         Partial<PaymentRow>
       >;
       tickets: TableConfig<TicketRow, Insertable<TicketRow>, Partial<TicketRow>>;
@@ -698,6 +741,17 @@ export type Database = {
         Partial<PerformanceKpiRow>
       >;
       trainings: TableConfig<TrainingRow, Partial<TrainingRow> & Pick<TrainingRow, "employee_id" | "name">, Partial<TrainingRow>>;
+      record_files: TableConfig<
+        RecordFileRow,
+        Partial<RecordFileRow> & Pick<RecordFileRow, "area" | "entity_id" | "path" | "file_name">,
+        Partial<RecordFileRow>
+      >;
+      debtor_age_reports: TableConfig<DebtorAgeReportRow, Partial<DebtorAgeReportRow> & Pick<DebtorAgeReportRow, "as_of">, Partial<DebtorAgeReportRow>>;
+      debtor_age_lines: TableConfig<
+        DebtorAgeLineRow,
+        Partial<DebtorAgeLineRow> & Pick<DebtorAgeLineRow, "report_id" | "customer_name">,
+        Partial<DebtorAgeLineRow>
+      >;
       activity_logs: TableConfig<
         ActivityLogRow,
         Partial<ActivityLogRow> & Pick<ActivityLogRow, "action" | "entity">,
