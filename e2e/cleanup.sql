@@ -22,4 +22,18 @@ delete from public.payments where reference like 'E2E %' or payer_name like 'E2E
 delete from public.payslips where user_id in (select id from public.profiles where email like 'e2e.%@example.com');
 delete from public.employees where user_id in (select id from public.profiles where email like 'e2e.%@example.com');
 delete from public.deals where title like 'E2E %';
+-- Files whose record no longer exists (e.g. deals or debtors reports removed by live-cleanup.cjs)
+delete from storage.objects where bucket_id = 'records' and name in (
+  select f.path from public.record_files f
+  where (f.area = 'deal' and not exists (select 1 from public.deals d where d.id = f.entity_id))
+     or (f.area = 'debtors' and not exists (select 1 from public.debtor_age_reports r where r.id = f.entity_id))
+     or (f.area = 'payslip' and not exists (select 1 from public.payslips p where p.id = f.entity_id))
+     or (f.area = 'payment' and not exists (select 1 from public.payments p where p.id = f.entity_id)));
+delete from public.record_files f
+  where (f.area = 'deal' and not exists (select 1 from public.deals d where d.id = f.entity_id))
+     or (f.area = 'debtors' and not exists (select 1 from public.debtor_age_reports r where r.id = f.entity_id))
+     or (f.area = 'payslip' and not exists (select 1 from public.payslips p where p.id = f.entity_id))
+     or (f.area = 'payment' and not exists (select 1 from public.payments p where p.id = f.entity_id));
+delete from public.invitations where email like 'e2e.%@example.com';
+delete from public.profiles where email like 'e2e.%@example.com';
 commit;
