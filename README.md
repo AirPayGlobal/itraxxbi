@@ -138,20 +138,25 @@ inserts/updates to `never`.
 
 | Module | Status |
 | --- | --- |
-| Dashboard home | ✅ KPIs + charts derived from live data |
-| Customers | ✅ Wired to Supabase (full CRUD) |
+| Dashboard home | ✅ KPIs, charts and recent activity from live data |
+| Customers | ✅ Wired to Supabase (full CRUD) + client portal invites |
 | Tasks | ✅ Wired (CRUD, derived KPIs) |
 | Job Cards | ✅ Wired (CRUD, derived stats) |
-| Finance | ✅ Invoices + Expenses wired (CRUD, approve). Reports charts still mock |
+| Finance | ✅ Invoices + Expenses (CRUD, approve); Reports charts derived from them |
 | Tickets | ✅ Wired (tickets + comment thread) |
 | Projects | ✅ Wired (CRUD; tasks/Gantt derived from tasks table) |
 | Inventory | ✅ Wired (assets CRUD, low-stock alerts) |
 | HR | ✅ Wired (leave requests + employee directory, linked to profiles) |
-| Staff, Payslips, My-Portal | ⏳ Mock — Payslips needs a table |
-| Documents | ✅ Wired — upload to a **private** Storage bucket, served via signed URLs |
-| Settings | ⏳ Mock — only the company logo persists (localStorage) |
-| Customer-Onboarding, Sales-Pipeline | ⏳ Mock — no backing tables yet |
-| TRAXX, Meeting-AI | Simulated by design (no LLM) |
+| Staff Performance | ✅ Derived from tasks, job cards, tickets, `performance_kpis`, trainings |
+| Payslips | ✅ `payslips` table; generated from `employees.salary` with Namibian PAYE/SSC (`src/lib/payroll.ts`) |
+| My Portal | ✅ The signed-in person's tasks, job cards, tickets, leave and payslips |
+| Sales Pipeline | ✅ `deals` table (CRUD, stages, escalations, rule-based insights) |
+| Customer Onboarding | ✅ `customer_onboarding` table (stage checklist) |
+| Meeting AI | ✅ `meetings` table; browser speech-to-text or typed notes, rule-based summary, action items → tasks |
+| TRAXX | ✅ Answers computed from live data (keyword matching, no LLM); reminders are real tasks |
+| Documents | ✅ Upload to a **private** Storage bucket, served via signed URLs |
+| Settings | ✅ Company profile, my account, security (Clerk) |
+| Client portal (`/portal`) | ✅ Client's own vehicles, jobs, approved inspections, invoices, tickets |
 
 ## Database schema
 

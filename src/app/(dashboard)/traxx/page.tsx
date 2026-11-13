@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import {
   Bot,
@@ -239,8 +239,7 @@ export default function TraxxAIPage() {
   }, [messages, isTyping]);
 
   // --- Chat ---
-  const sendMessage = useCallback(
-    async (text: string) => {
+  const sendMessage = async (text: string) => {
       const question = text.trim();
       if (!question || isTyping) return;
 
@@ -282,9 +281,7 @@ export default function TraxxAIPage() {
 
       setMessages((prev) => [...prev, { id: newId("a"), role: "assistant", content: reply, timestamp: new Date() }]);
       setIsTyping(false);
-    },
-    [isTyping, messages, profile, createTask]
-  );
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
