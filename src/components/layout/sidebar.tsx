@@ -75,7 +75,7 @@ export function Sidebar({ collapsed, onToggle, onOpenCommand }: SidebarProps) {
     .sort((a, b) => b.length - a.length)[0];
   const isActive = (href: string) => href === activeHref;
 
-  const logoSrc = customLogo || "/logo-wordmark.svg";
+  const logoSrc = customLogo || "/brand/itrackerx-logo.png";
 
   return (
     <aside
@@ -91,7 +91,7 @@ export function Sidebar({ collapsed, onToggle, onOpenCommand }: SidebarProps) {
             customLogo ? (
               <img src={customLogo} alt="Logo" className="h-9 w-9 flex-shrink-0 object-contain" />
             ) : (
-              <img src="/logo-icon.svg" alt="iTrackerX" className="h-9 w-9 flex-shrink-0" />
+              <img src="/brand/itrackerx-icon.png" alt="iTrackerX" className="h-9 w-9 flex-shrink-0" />
             )
           ) : (
             <img
