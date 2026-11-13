@@ -95,6 +95,10 @@ export async function diagnoseAccess(clerkUserId: string): Promise<AccessDiagnos
 
   // A cheap query that fails clearly on a wrong key, wrong project or missing schema.
   const probe = await db.from("profiles").select("id", { count: "exact", head: true });
+  if (probe.error && probe.status === 0) {
+    // supabase-js reports network failures as just "fetch failed"; find the underlying cause.
+    return { ...base, reason: "database-error", detail: `Can't reach ${new URL(SUPABASE_URL).host}: ${await networkCause()}` };
+  }
   if (probe.error) {
     return { ...base, reason: "database-error", detail: `${probe.error.message || probe.error.code || "Request failed"} (HTTP ${probe.status})` };
   }
@@ -110,4 +114,25 @@ export async function diagnoseAccess(clerkUserId: string): Promise<AccessDiagnos
   if (!emails.some((e) => e.verified)) return { ...base, reason: "unverified-email" };
 
   return { ...base, reason: "not-invited" };
+}
+
+/** The low-level reason a request to the Supabase API fails (DNS, refused, TLS, timeout...). */
+async function networkCause(): Promise<string> {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/health`, { cache: "no-store", signal: AbortSignal.timeout(8000) });
+    return `a direct request worked (HTTP ${res.status}), so the failure is intermittent; try again`;
+  } catch (err) {
+    const e = err as Error & { cause?: { code?: string; message?: string; hostname?: string } };
+    const code = e.cause?.code;
+    const hints: Record<string, string> = {
+      ENOTFOUND: "the address doesn't exist (DNS). The Supabase project is probably paused or deleted",
+      EAI_AGAIN: "DNS lookup failed temporarily",
+      ECONNREFUSED: "the connection was refused",
+      ECONNRESET: "the connection was reset",
+      UND_ERR_CONNECT_TIMEOUT: "the connection timed out",
+      TimeoutError: "the request timed out",
+    };
+    const name = code ?? e.name;
+    return `${hints[name] ?? e.cause?.message ?? e.message} [${name}]`;
+  }
 }
