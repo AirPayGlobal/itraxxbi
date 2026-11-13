@@ -32,6 +32,8 @@ import {
   Car,
   UserPlus,
   RefreshCw,
+  Upload,
+  Download,
 } from "lucide-react";
 import {
   BarChart,
@@ -59,12 +61,20 @@ import {
   useAddEscalation,
   useUpdateEscalation,
   useConvertDealToCustomer,
+  useImportDeals,
+  fetchDealImportLookups,
+  dealKey,
   STAGE_PROBABILITY,
   type Deal,
   type DealInput,
+  type DealImportRecord,
   type EscalationDept,
   type EscalationStatus,
+  type StaffMember,
 } from "@/lib/hooks/use-deals";
+import { ImportDialog, type ImportField, type MappedRow, type RowCheck } from "@/components/data-import/import-dialog";
+import { RecordFiles } from "@/components/files/record-files";
+import { downloadText, parseAmount, parseDate, toCsv } from "@/lib/import/parse";
 
 // ---------------------------------------------------------------------------
 // Types & configuration
@@ -192,6 +202,68 @@ const inputCls =
   "w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white";
 
 // ---------------------------------------------------------------------------
+// Import / export helpers
+// ---------------------------------------------------------------------------
+
+const DEAL_IMPORT_FIELDS: ImportField[] = [
+  { key: "title", label: "Title", required: true, aliases: ["title", "deal", "deal name", "deal title", "opportunity", "opportunity name", "deal description"], example: "Fleet tracking rollout" },
+  { key: "company", label: "Company", required: true, aliases: ["company", "company name", "account", "account name", "organisation", "organization", "customer", "client"], example: "Acme Logistics" },
+  { key: "contact_name", label: "Contact name", aliases: ["contact name", "contact", "contact person", "primary contact"], example: "Jane Doe" },
+  { key: "contact_email", label: "Contact email", aliases: ["contact email", "email", "e-mail", "email address"], example: "jane@acme.com" },
+  { key: "contact_phone", label: "Contact phone", aliases: ["contact phone", "phone", "telephone", "mobile", "cell", "phone number"], example: "+264 81 000 0000" },
+  { key: "value", label: "Value", aliases: ["value", "deal value", "amount", "deal amount", "revenue", "total"], example: "N$ 125,000" },
+  { key: "fleet_size", label: "Fleet size", aliases: ["fleet size", "fleet", "vehicles", "vehicle count", "units", "no of vehicles"], example: "40" },
+  { key: "stage", label: "Stage", aliases: ["stage", "deal stage", "status", "pipeline stage"], example: "Proposal" },
+  { key: "probability", label: "Probability", aliases: ["probability", "probability %", "win probability", "chance", "likelihood"], example: "50" },
+  { key: "owner", label: "Owner", aliases: ["owner", "owner email", "deal owner", "sales rep", "salesperson", "assigned to", "rep"], example: "" },
+  { key: "expected_close", label: "Expected close", aliases: ["expected close", "expected close date", "close date", "closing date", "close"], example: "2026-12-15" },
+  { key: "source", label: "Source", aliases: ["source", "lead source", "channel", "origin"], example: "Referral" },
+  { key: "notes", label: "Notes", aliases: ["notes", "note", "comments", "description", "details"], example: "" },
+];
+
+const words = (s: string) => ` ${s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()} `;
+
+/** Maps common stage wording ("won", "proposal sent", "negotiating", "new") to a pipeline stage. */
+function mapStage(raw: string): Stage | null {
+  const w = words(raw);
+  if (!w.trim()) return null;
+  if (/ (closed lost|lost|dead|declined|rejected|cancelled|canceled|no deal) /.test(w)) return "closed_lost";
+  if (/ (closed won|won|win|signed|contracted) /.test(w)) return "closed_won";
+  if (/ negotiat/.test(w) || / (contract sent|commit|commitment) /.test(w)) return "negotiation";
+  if (/ (proposal|proposals|quote|quoted|quotation|tender|offer) /.test(w)) return "proposal";
+  if (/ (qualified|qualifying|qualification|sql|discovery|demo|meeting) /.test(w)) return "qualified";
+  if (/ (lead|new|new lead|prospect|open|contacted|cold|mql|inquiry|enquiry) /.test(w)) return "lead";
+  return null;
+}
+
+/** "70", "70%", "0.7" → 70; anything else → null. */
+function parseProbability(raw: string): number | null {
+  const s = raw.trim().replace(/%$/, "").trim();
+  if (!s) return null;
+  let n = Number(s.replace(",", "."));
+  if (!isFinite(n)) return null;
+  if (n > 0 && n < 1 && s.includes(".") && !raw.includes("%")) n *= 100;
+  if (n < 0 || n > 100) return null;
+  return Math.round(n);
+}
+
+function matchStaff(raw: string, staff: StaffMember[]): StaffMember | null {
+  const q = raw.trim().toLowerCase();
+  if (!q) return null;
+  const byEmail = staff.find((s) => (s.email ?? "").toLowerCase() === q);
+  if (byEmail) return byEmail;
+  const byName = staff.filter((s) => (s.name ?? "").trim().toLowerCase() === q);
+  if (byName.length === 1) return byName[0];
+  const partial = staff.filter((s) => {
+    const n = (s.name ?? "").toLowerCase();
+    return n && (n.startsWith(q + " ") || n.split(/\s+/).includes(q));
+  });
+  return partial.length === 1 ? partial[0] : null;
+}
+
+const looksLikeEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -208,6 +280,8 @@ export default function SalesPipelinePage() {
   const addEscalation = useAddEscalation();
   const updateEscalation = useUpdateEscalation();
   const convertDeal = useConvertDealToCustomer();
+  const importDeals = useImportDeals();
+  const [showImport, setShowImport] = useState(false);
 
   const [now] = useState(() => Date.now());
   const [searchQuery, setSearchQuery] = useState("");
@@ -486,6 +560,145 @@ export default function SalesPipelinePage() {
   const saving = createDeal.isPending || updateDeal.isPending;
 
   // -------------------------------------------------------------------------
+  // Import / export
+  // -------------------------------------------------------------------------
+
+  const validateImport = async (rows: MappedRow[]): Promise<RowCheck<DealImportRecord>[]> => {
+    const { existingKeys, customers } = await fetchDealImportLookups();
+    const customerByName = new Map<string, { id: string; label: string }>();
+    for (const c of customers) {
+      for (const n of [c.company, c.name]) {
+        const k = n?.trim().toLowerCase();
+        if (k && !customerByName.has(k)) customerByName.set(k, { id: c.id, label: c.company || c.name });
+      }
+    }
+    const me = profile ? staff.find((s) => s.id === profile.id) ?? null : null;
+    const myLabel = me?.name || profile?.name || "You";
+    const seenInFile = new Map<string, number>();
+
+    return rows.map((row): RowCheck<DealImportRecord> => {
+      const v = row.values;
+      const notes: string[] = [];
+      const title = v.title.replace(/\s+/g, " ").trim();
+      const company = v.company.replace(/\s+/g, " ").trim();
+      if (!title) return { line: row.line, ok: false, error: "Title is empty." };
+      if (!company) return { line: row.line, ok: false, error: "Company is empty." };
+
+      const key = dealKey(title, company);
+      if (existingKeys.has(key))
+        return { line: row.line, ok: false, error: `Already in the pipeline: "${title}" for ${company} exists.` };
+      const earlier = seenInFile.get(key);
+      if (earlier) return { line: row.line, ok: false, error: `Duplicate of row ${earlier} ("${title}" for ${company}).` };
+      seenInFile.set(key, row.line);
+
+      let value = 0;
+      if (v.value) {
+        const n = parseAmount(v.value);
+        if (n === null) return { line: row.line, ok: false, error: `Value "${v.value}" isn't a number.` };
+        if (n < 0) return { line: row.line, ok: false, error: `Value ${v.value} is negative.` };
+        value = Math.round(n * 100) / 100;
+      }
+
+      let fleet: number | null = null;
+      if (v.fleet_size) {
+        const n = parseAmount(v.fleet_size);
+        if (n === null || n < 0) notes.push(`Fleet size "${v.fleet_size}" ignored`);
+        else fleet = Math.round(n);
+      }
+
+      let stage: Stage = "lead";
+      if (v.stage) {
+        const mapped = mapStage(v.stage);
+        if (mapped) stage = mapped;
+        else notes.push(`Stage "${v.stage}" not recognised, set to New Lead`);
+      }
+
+      let probability = STAGE_PROBABILITY[stage];
+      if (v.probability) {
+        const p = parseProbability(v.probability);
+        if (p === null) notes.push(`Probability "${v.probability}" ignored, using ${probability}%`);
+        else probability = p;
+      }
+
+      let ownerId = profile?.id ?? null;
+      let ownerLabel = myLabel;
+      if (v.owner) {
+        const hit = matchStaff(v.owner, staff);
+        if (hit) {
+          ownerId = hit.id;
+          ownerLabel = hit.name || hit.email || "Staff member";
+        } else notes.push(`Owner "${v.owner}" not found, assigned to ${myLabel}`);
+      }
+
+      let expectedClose: string | null = null;
+      if (v.expected_close) {
+        expectedClose = parseDate(v.expected_close);
+        if (!expectedClose) notes.push(`Expected close "${v.expected_close}" isn't a date, left empty`);
+      }
+
+      const email = v.contact_email.trim();
+      if (email && !looksLikeEmail(email)) notes.push(`Contact email "${email}" looks invalid`);
+
+      const customer = customerByName.get(company.toLowerCase()) ?? null;
+
+      return {
+        line: row.line,
+        ok: true,
+        note: notes.length ? notes.join("; ") : undefined,
+        record: {
+          title,
+          company,
+          contact_name: v.contact_name || null,
+          contact_email: email || null,
+          contact_phone: v.contact_phone || null,
+          value,
+          fleet_size: fleet,
+          stage,
+          probability,
+          owner_id: ownerId,
+          expected_close: expectedClose,
+          source: v.source || null,
+          notes: v.notes || null,
+          customer_id: customer?.id ?? null,
+          owner_label: ownerLabel,
+          customer_label: customer?.label ?? null,
+        },
+      };
+    });
+  };
+
+  const runImport = async (records: DealImportRecord[]): Promise<string> => {
+    const saved = await importDeals.mutateAsync(records);
+    const linked = records.filter((r) => r.customer_id).length;
+    return `${saved} ${saved === 1 ? "deal" : "deals"} imported${linked ? ` (${linked} linked to existing customers)` : ""}`;
+  };
+
+  const exportCsv = () => {
+    const ownerEmail = (id: string | null) => (id ? staff.find((s) => s.id === id)?.email ?? "" : "");
+    const csv = toCsv(
+      ["Title", "Company", "Contact name", "Contact email", "Contact phone", "Value", "Fleet size", "Stage", "Probability", "Owner", "Owner email", "Expected close", "Source", "Notes", "Last activity"],
+      filteredDeals.map((d) => [
+        d.title,
+        d.company,
+        d.contact_name ?? "",
+        d.contact_email ?? "",
+        d.contact_phone ?? "",
+        d.value,
+        d.fleet_size ?? "",
+        stageById(d.stage).label,
+        d.probability,
+        d.owner_id ? staffName(d.owner_id) : "",
+        ownerEmail(d.owner_id),
+        d.expected_close ?? "",
+        d.source ?? "",
+        d.notes ?? "",
+        d.last_activity_at ? d.last_activity_at.slice(0, 10) : "",
+      ])
+    );
+    downloadText(`deals-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+  };
+
+  // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
 
@@ -539,6 +752,25 @@ export default function SalesPipelinePage() {
                 <span className="bg-white/20 text-white text-xs px-1.5 py-0.5 rounded-full">{activeInsights.length}</span>
               </button>
             )}
+            {deals.length > 0 && (
+              <button
+                onClick={exportCsv}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
+                title={searchQuery ? "Export the deals matching your search" : "Export all deals"}
+              >
+                <Download className="h-4 w-4" />
+                Export CSV
+              </button>
+            )}
+            {canEdit && (
+              <button
+                onClick={() => setShowImport(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
+              >
+                <Upload className="h-4 w-4" />
+                Import deals
+              </button>
+            )}
             {canEdit && (
               <button
                 onClick={openCreate}
@@ -551,6 +783,24 @@ export default function SalesPipelinePage() {
           </div>
         </div>
       </div>
+
+      <ImportDialog<DealImportRecord>
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        title="Import deals"
+        description="Upload a CSV or Excel export from your CRM or spreadsheet. Deals already in the pipeline (same title and company) are skipped."
+        fields={DEAL_IMPORT_FIELDS}
+        templateName="deals-import-template"
+        validate={validateImport}
+        importRows={runImport}
+        preview={[
+          { label: "Title", value: (r) => r.title },
+          { label: "Company", value: (r) => (r.customer_id ? `${r.company} (customer)` : r.company) },
+          { label: "Value", value: (r) => formatCurrency(r.value ?? 0) },
+          { label: "Stage", value: (r) => `${stageById(r.stage).label} · ${r.probability}%` },
+          { label: "Owner", value: (r) => r.owner_label },
+        ]}
+      />
 
       {isLoading ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white py-24">
@@ -578,13 +828,22 @@ export default function SalesPipelinePage() {
             {canEdit ? "Add your first deal to start building the pipeline." : "Deals will appear here once the sales team adds them."}
           </p>
           {canEdit && (
-            <button
-              onClick={openCreate}
-              className="mt-4 flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              Add Deal
-            </button>
+            <div className="mt-4 flex items-center gap-3">
+              <button
+                onClick={openCreate}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                Add Deal
+              </button>
+              <button
+                onClick={() => setShowImport(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
+              >
+                <Upload className="h-4 w-4" />
+                Import deals
+              </button>
+            </div>
           )}
         </div>
       ) : (
@@ -1047,6 +1306,16 @@ export default function SalesPipelinePage() {
                   <p className="text-sm text-slate-600 bg-slate-50 rounded-lg p-3 whitespace-pre-line">{selectedDeal.notes}</p>
                 </div>
               )}
+
+              {/* Documents Section */}
+              <RecordFiles
+                key={selectedDeal.id}
+                area="deal"
+                entityId={selectedDeal.id}
+                canEdit={canEdit}
+                title="Documents"
+                emptyText={canEdit ? "No documents yet. Attach quotes, proposals or signed contracts." : "No documents attached."}
+              />
 
               {/* Escalations Section */}
               <div className="space-y-3">

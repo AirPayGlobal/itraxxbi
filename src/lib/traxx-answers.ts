@@ -334,7 +334,7 @@ async function answerInvoices(me: TraxxUser): Promise<string> {
     .in("invoice_id", rows.map((r) => r.id));
   if (pe) throw pe;
   const paid = new Map<string, number>();
-  for (const p of pays ?? []) paid.set(p.invoice_id, (paid.get(p.invoice_id) ?? 0) + Number(p.amount));
+  for (const p of pays ?? []) if (p.invoice_id) paid.set(p.invoice_id, (paid.get(p.invoice_id) ?? 0) + Number(p.amount));
 
   const today = toDateKey(new Date());
   const balance = (r: (typeof rows)[number]) => Math.max(0, Number(r.total) - (paid.get(r.id) ?? 0));

@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -25,14 +27,26 @@ import {
   Loader2,
   RefreshCw,
   ShieldAlert,
+  Upload,
+  FileUp,
+  Paperclip,
+  CheckCircle2,
 } from "lucide-react";
+import { ImportDialog } from "@/components/data-import/import-dialog";
+import { RecordFiles } from "@/components/files/record-files";
+import { uploadRecordFile } from "@/lib/hooks/use-record-files";
+import { PAYSLIP_IMPORT_FIELDS, matchPdfToPayslip, type PayslipImportRecord } from "@/lib/import/payslip-import";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { useAuth } from "@/components/providers/session-provider";
 import { useCompanySettings } from "@/lib/hooks/use-company-settings";
 import {
+  PAYSLIP_FILES_KEY,
+  checkPayslipImport,
+  importPayslips,
   useGeneratePayslips,
   useMarkPayslipsSent,
   usePayrollPeople,
+  usePayslipFiles,
   usePayslipPeriods,
   usePayslipsForPeriod,
   useUpdatePayslip,
@@ -130,6 +144,9 @@ function PayrollAdmin() {
   const [generateYear, setGenerateYear] = useState(() => new Date().getFullYear());
   const [viewId, setViewId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
+  const [showImport, setShowImport] = useState(false);
+  const [showPdfUpload, setShowPdfUpload] = useState(false);
+  const qc = useQueryClient();
 
   const periodsQ = usePayslipPeriods();
   const peopleQ = usePayrollPeople();
@@ -149,6 +166,20 @@ function PayrollAdmin() {
     () => new Map((peopleQ.data ?? []).map((p) => [p.id, p] as const)),
     [peopleQ.data]
   );
+
+  const filesQ = usePayslipFiles(periodPayslips.map((p) => p.id));
+  const filesByPayslip = filesQ.data;
+
+  async function runImport(records: PayslipImportRecord[]): Promise<string> {
+    const { created, updated } = await importPayslips(records);
+    qc.invalidateQueries({ queryKey: ["payslips"] });
+    const periodsImported = [...new Set(records.map((r) => r.period))];
+    if (periodsImported.length === 1) setChosenPeriod(periodsImported[0]);
+    const parts = [];
+    if (created) parts.push(`${created} payslip${created === 1 ? "" : "s"} imported`);
+    if (updated) parts.push(`${updated} updated`);
+    return parts.join(", ") || "Nothing to import";
+  }
 
   const viewPayslip = periodPayslips.find((p) => p.id === viewId) ?? null;
   const editPayslip = periodPayslips.find((p) => p.id === editId) ?? null;
@@ -236,6 +267,22 @@ function PayrollAdmin() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => setShowImport(true)}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+          >
+            <Upload className="h-4 w-4" />
+            Import Payslips
+          </button>
+          <button
+            onClick={() => setShowPdfUpload(true)}
+            disabled={tableLoading || periodPayslips.length === 0}
+            title={periodPayslips.length === 0 ? "No payslips in this period to attach PDFs to" : undefined}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <FileUp className="h-4 w-4" />
+            Upload PDFs
+          </button>
           <button
             onClick={() => setShowGenerateModal(true)}
             className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
@@ -386,7 +433,12 @@ function PayrollAdmin() {
                         </div>
                         <div>
                           <p className="text-sm font-medium text-slate-900">{name}</p>
-                          <p className="text-xs text-slate-400">{ps.payslip_number}</p>
+                          <p className="flex items-center gap-1 text-xs text-slate-400">
+                            {ps.payslip_number}
+                            {filesByPayslip?.get(ps.id)?.length ? (
+                              <Paperclip className="h-3 w-3 text-blue-500" aria-label="PDF attached" />
+                            ) : null}
+                          </p>
                         </div>
                       </div>
                     </td>
@@ -448,7 +500,7 @@ function PayrollAdmin() {
                 <tr>
                   <td colSpan={8} className="px-6 py-12 text-center text-sm text-slate-500">
                     No payslips for {formatPeriod(selectedPeriod)} yet. Click &quot;Generate
-                    Payslips&quot; to create them.
+                    Payslips&quot; to create them, or &quot;Import Payslips&quot; to load a payroll export.
                   </td>
                 </tr>
               )}
@@ -548,7 +600,10 @@ function PayrollAdmin() {
           <PayslipDetailModal
             payslip={viewPayslip}
             person={peopleById.get(viewPayslip.user_id)}
-            onClose={() => setViewId(null)}
+            onClose={() => {
+              setViewId(null);
+              qc.invalidateQueries({ queryKey: PAYSLIP_FILES_KEY });
+            }}
             onEdit={() => {
               setViewId(null);
               setEditId(viewPayslip.id);
@@ -570,6 +625,302 @@ function PayrollAdmin() {
           />
         )}
       </AnimatePresence>
+
+      <ImportDialog<PayslipImportRecord>
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        title="Import payslips"
+        description="Load payroll already calculated elsewhere, e.g. an export from your payroll provider. Each row is one employee for one month. Rows for payslips that are still draft or generated update them; sent payslips are left alone."
+        fields={PAYSLIP_IMPORT_FIELDS}
+        templateName="payslips-import-template"
+        validate={checkPayslipImport}
+        importRows={runImport}
+        extra={
+          <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+            Employees are matched by email, then employee number, then exact full name. Give a period
+            (e.g. &quot;Nov 2026&quot;) or a pay date for each row. Basic salary, gross pay, total deductions and
+            net pay are required; PAYE, social security, pension, medical aid and other allowances are
+            optional line items. Imported payslips are marked GENERATED so you can review them before sending.
+          </p>
+        }
+        preview={[
+          { label: "Employee", value: (r) => r.employee_name },
+          { label: "Period", value: (r) => formatPeriod(r.period) },
+          { label: "Gross", value: (r) => formatCurrency(r.gross_pay) },
+          { label: "Deductions", value: (r) => formatCurrency(r.total_deductions) },
+          { label: "Net Pay", value: (r) => formatCurrency(r.net_pay) },
+          { label: "Action", value: (r) => (r.existing_number ? `Update ${r.existing_number}` : "New") },
+        ]}
+      />
+
+      {showPdfUpload && (
+        <BulkPdfDialog
+          period={selectedPeriod}
+          payslips={periodPayslips}
+          peopleById={peopleById}
+          filesByPayslip={filesByPayslip}
+          onClose={() => setShowPdfUpload(false)}
+          onDone={() => {
+            qc.invalidateQueries({ queryKey: ["record-files"] });
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Bulk PDF upload
+// ---------------------------------------------------------------------------
+
+type PdfRow = { key: string; file: File; payslipId: string; how: string | null; reason: string | null; include: boolean };
+
+function BulkPdfDialog({
+  period,
+  payslips,
+  peopleById,
+  filesByPayslip,
+  onClose,
+  onDone,
+}: {
+  period: string;
+  payslips: Payslip[];
+  peopleById: Map<string, PayrollPerson>;
+  filesByPayslip: Map<string, { id: string }[]> | undefined;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  const [rows, setRows] = useState<PdfRow[]>([]);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [failures, setFailures] = useState<string[]>([]);
+  const uploading = progress !== null;
+
+  const candidates = useMemo(
+    () =>
+      payslips.map((ps) => {
+        const p = peopleById.get(ps.user_id);
+        return {
+          payslipId: ps.id,
+          person: {
+            id: ps.user_id,
+            name: p?.name ?? "",
+            email: p?.email ?? "",
+            employee_number: p?.employee?.employee_number ?? null,
+          },
+        };
+      }),
+    [payslips, peopleById]
+  );
+  const labelFor = (id: string) => {
+    const ps = payslips.find((p) => p.id === id);
+    if (!ps) return "";
+    const p = peopleById.get(ps.user_id);
+    return `${p?.name ?? "Unknown employee"} · ${ps.payslip_number}`;
+  };
+
+  function pick(list: FileList | null) {
+    const files = Array.from(list ?? []);
+    if (input.current) input.current.value = "";
+    if (!files.length) return;
+    const notPdf = files.filter((f) => !(f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf")));
+    if (notPdf.length) toast.error(`${notPdf.length} file${notPdf.length === 1 ? " isn't a PDF" : "s aren't PDFs"} and ${notPdf.length === 1 ? "was" : "were"} left out`);
+    setFailures([]);
+    setRows(
+      files
+        .filter((f) => !notPdf.includes(f))
+        .map((file, i) => {
+          const m = matchPdfToPayslip(file.name, candidates);
+          const key = `${i}-${file.name}-${file.size}`;
+          if (m.payslipId === null) return { key, file, payslipId: "", how: null, reason: m.reason, include: false };
+          return { key, file, payslipId: m.payslipId, how: m.how, reason: null, include: !filesByPayslip?.get(m.payslipId)?.length };
+        })
+    );
+  }
+
+  const assignedCount = new Map<string, number>();
+  for (const r of rows) if (r.payslipId && r.include) assignedCount.set(r.payslipId, (assignedCount.get(r.payslipId) ?? 0) + 1);
+  const toUpload = rows.filter((r) => r.include && r.payslipId);
+  const unmatched = rows.filter((r) => !r.payslipId);
+
+  async function upload() {
+    const failed: string[] = [];
+    const failedKeys = new Set<string>();
+    let ok = 0;
+    setProgress({ done: 0, total: toUpload.length });
+    for (const [i, r] of toUpload.entries()) {
+      try {
+        await uploadRecordFile("payslip", r.payslipId, r.file);
+        ok++;
+      } catch (e) {
+        failed.push(`${r.file.name}: ${(e as Error).message}`);
+        failedKeys.add(r.key);
+      }
+      setProgress({ done: i + 1, total: toUpload.length });
+    }
+    setProgress(null);
+    onDone();
+    if (ok) toast.success(`${ok} PDF${ok === 1 ? "" : "s"} attached`);
+    if (failed.length) {
+      toast.error(`${failed.length} upload${failed.length === 1 ? "" : "s"} failed`);
+      setFailures(failed);
+      // Keep only the failed files so they can be retried.
+      setRows((prev) => prev.filter((r) => failedKeys.has(r.key)));
+    } else {
+      onClose();
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={uploading ? undefined : onClose}>
+      <div
+        className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl bg-white shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between border-b border-slate-200 px-6 py-4">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Upload payslip PDFs</h2>
+            <p className="mt-0.5 text-sm text-slate-500">
+              {formatPeriod(period)} · {payslips.length} payslip{payslips.length === 1 ? "" : "s"}. Files are matched by
+              employee number, email or name in the file name.
+            </p>
+          </div>
+          <button onClick={onClose} disabled={uploading} aria-label="Close" className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-50">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
+          <div className="flex flex-wrap items-center gap-3">
+            <input ref={input} type="file" multiple accept="application/pdf,.pdf" className="hidden" onChange={(e) => pick(e.target.files)} />
+            <button
+              onClick={() => input.current?.click()}
+              disabled={uploading}
+              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+            >
+              <Upload className="h-4 w-4" />
+              {rows.length ? "Choose other files" : "Choose PDF files"}
+            </button>
+            {rows.length > 0 && (
+              <span className="flex items-center gap-1.5 text-sm text-slate-600">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                {rows.length - unmatched.length} of {rows.length} matched
+              </span>
+            )}
+          </div>
+
+          {rows.length === 0 && (
+            <p className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
+              Choose the PDF payslips for {formatPeriod(period)}. Name each file with the employee number
+              (e.g. <span className="font-mono">EMP-001.pdf</span>) or the employee&apos;s name or email. You confirm
+              the matches before anything is uploaded.
+            </p>
+          )}
+
+          {failures.length > 0 && (
+            <ul className="space-y-1 rounded-lg bg-red-50 p-3 text-xs text-red-700">
+              {failures.map((f) => (
+                <li key={f}>{f}</li>
+              ))}
+            </ul>
+          )}
+
+          {rows.length > 0 && (
+            <div className="overflow-auto rounded-lg border border-slate-200">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-slate-50">
+                  <tr>
+                    <th className="w-10 px-3 py-2" />
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">File</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Payslip</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-slate-500">Note</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {rows.map((r) => {
+                    const hasFile = r.payslipId ? !!filesByPayslip?.get(r.payslipId)?.length : false;
+                    const dup = r.payslipId && r.include && (assignedCount.get(r.payslipId) ?? 0) > 1;
+                    return (
+                      <tr key={r.key} className={cn(!r.payslipId && "bg-amber-50/50")}>
+                        <td className="px-3 py-2 text-center">
+                          <input
+                            type="checkbox"
+                            checked={r.include && !!r.payslipId}
+                            disabled={!r.payslipId || uploading}
+                            onChange={(e) => setRows((prev) => prev.map((x) => (x.key === r.key ? { ...x, include: e.target.checked } : x)))}
+                            aria-label={`Upload ${r.file.name}`}
+                          />
+                        </td>
+                        <td className="max-w-[16rem] truncate px-3 py-2 text-slate-700" title={r.file.name}>
+                          {r.file.name}
+                        </td>
+                        <td className="px-3 py-2">
+                          <select
+                            value={r.payslipId}
+                            disabled={uploading}
+                            onChange={(e) =>
+                              setRows((prev) =>
+                                prev.map((x) =>
+                                  x.key === r.key ? { ...x, payslipId: e.target.value, include: !!e.target.value, how: e.target.value ? "chosen by you" : null } : x
+                                )
+                              )
+                            }
+                            className={cn(
+                              "w-full min-w-[14rem] rounded-lg border bg-white px-2 py-1 text-sm text-slate-800",
+                              r.payslipId ? "border-slate-300" : "border-amber-300"
+                            )}
+                          >
+                            <option value="">— not matched —</option>
+                            {payslips.map((ps) => (
+                              <option key={ps.id} value={ps.id}>
+                                {labelFor(ps.id)}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-3 py-2 text-xs">
+                          {!r.payslipId ? (
+                            <span className="text-amber-700">{r.reason ?? "Not matched"}; won&apos;t be uploaded</span>
+                          ) : (
+                            <span className="text-slate-500">
+                              {r.how && `Matched by ${r.how}`}
+                              {hasFile && <span className="block text-amber-700">Already has a PDF; this adds another</span>}
+                              {dup && <span className="block text-amber-700">Another file is going to this payslip too</span>}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-6 py-4">
+          <p className="text-xs text-slate-500">
+            {progress
+              ? `Uploading ${progress.done} of ${progress.total}…`
+              : unmatched.length
+                ? `${unmatched.length} unmatched file${unmatched.length === 1 ? "" : "s"} will be skipped`
+                : ""}
+          </p>
+          <div className="flex gap-3">
+            <button onClick={onClose} disabled={uploading} className="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 disabled:opacity-50">
+              Cancel
+            </button>
+            <button
+              onClick={upload}
+              disabled={!toUpload.length || uploading}
+              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {uploading && <Loader2 className="h-4 w-4 animate-spin" />}
+              Upload {toUpload.length || ""} PDF{toUpload.length === 1 ? "" : "s"}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -736,6 +1087,17 @@ function PayslipDetailModal({
               <Field icon={Banknote} label="Bank Name" value={emp?.bank_name ?? "Not on file"} />
               <Field label="Account Number" value={emp?.bank_account ?? "Not on file"} />
             </div>
+          </div>
+
+          <div className="mb-6">
+            <RecordFiles
+              area="payslip"
+              entityId={payslip.id}
+              canEdit /* this modal is only rendered for ADMIN/MANAGER (see PayslipsPage) */
+              accept="application/pdf"
+              title="Payslip PDF"
+              emptyText="No PDF attached. The employee sees the figures above in My Portal."
+            />
           </div>
 
           {(payslip.sent_at || payslip.viewed_at) && (

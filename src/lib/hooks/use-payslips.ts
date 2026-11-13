@@ -7,7 +7,15 @@ import type {
   EmployeeRow,
   PayslipRow,
   ProfileRow,
+  RecordFileRow,
 } from "@/lib/supabase/database.types";
+import type { MappedRow, RowCheck } from "@/components/data-import/import-dialog";
+import { parseDate, parsePeriod } from "@/lib/import/parse";
+import {
+  checkPayslipRows,
+  type ExistingPayslip,
+  type PayslipImportRecord,
+} from "@/lib/import/payslip-import";
 import {
   calculateStatutoryDeductions,
   cleanAmounts,
@@ -283,6 +291,130 @@ export function useMarkPayslipsSent() {
       );
     },
     onError: (e: Error) => toast.error(e.message || "Failed to mark payslips as sent"),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Import from a payroll export
+// ---------------------------------------------------------------------------
+
+/** Validates spreadsheet rows against staff and the payslips already on file for those periods. */
+export async function checkPayslipImport(rows: MappedRow[]): Promise<RowCheck<PayslipImportRecord>[]> {
+  const periods = new Set<string>();
+  for (const r of rows) {
+    const p = parsePeriod(r.values.period) ?? parseDate(r.values.pay_date)?.slice(0, 7);
+    if (p) periods.add(p);
+  }
+  const [people, existing] = await Promise.all([fetchPayrollPeople(), fetchExistingForPeriods([...periods])]);
+  return checkPayslipRows(
+    rows,
+    people.map((p) => ({ id: p.id, name: p.name, email: p.email, employee_number: p.employee?.employee_number ?? null })),
+    existing
+  );
+}
+
+async function fetchExistingForPeriods(periods: string[]): Promise<ExistingPayslip[]> {
+  if (!periods.length) return [];
+  const { data, error } = await supabase
+    .from("payslips")
+    .select("id, user_id, period, status, payslip_number")
+    .in("period", periods);
+  if (error) throw error;
+  return data ?? [];
+}
+
+/**
+ * Saves checked import records: updates the DRAFT/GENERATED payslips they replace and inserts
+ * the rest with fresh payslip numbers. Everything ends up GENERATED.
+ */
+export async function importPayslips(records: PayslipImportRecord[]): Promise<{ created: number; updated: number }> {
+  const me = await getSignedInProfile();
+  const amounts = (r: PayslipImportRecord) => ({
+    pay_date: r.pay_date,
+    basic_salary: r.basic_salary,
+    allowances: r.allowances,
+    deductions: r.deductions,
+    total_allowances: r.total_allowances,
+    total_deductions: r.total_deductions,
+    gross_pay: r.gross_pay,
+    net_pay: r.net_pay,
+    status: "GENERATED" as const,
+  });
+
+  let updated = 0;
+  const updates = records.filter((r) => r.existing_id);
+  for (const r of updates) {
+    const { data, error } = await supabase
+      .from("payslips")
+      .update(amounts(r))
+      .eq("id", r.existing_id!)
+      .in("status", ["DRAFT", "GENERATED"])
+      .select("id")
+      .maybeSingle();
+    if (error) throw new Error(`Row ${r.line}: ${error.message}`);
+    if (!data) throw new Error(`Row ${r.line}: ${r.existing_number} was sent while importing; ${updated} updated before this`);
+    updated++;
+  }
+
+  const inserts = records.filter((r) => !r.existing_id);
+  if (inserts.length) {
+    const periods = [...new Set(inserts.map((r) => r.period))];
+    const existing = await fetchExistingForPeriods(periods);
+    const taken = new Set(existing.map((e) => `${e.user_id}|${e.period}`));
+    const clash = inserts.find((r) => taken.has(`${r.user_id}|${r.period}`));
+    if (clash) {
+      throw new Error(
+        `Row ${clash.line}: ${clash.employee_name} got a payslip for ${formatPeriod(clash.period)} while importing; check the rows again`
+      );
+    }
+    const rows = periods.flatMap((period) => {
+      const forPeriod = inserts.filter((r) => r.period === period);
+      const numbers = nextPayslipNumbers(
+        period,
+        existing.filter((e) => e.period === period).map((e) => e.payslip_number),
+        forPeriod.length
+      );
+      return forPeriod.map((r, i) => ({
+        ...amounts(r),
+        payslip_number: numbers[i],
+        user_id: r.user_id,
+        period,
+        created_by_id: me?.id ?? null,
+      }));
+    });
+    const { error } = await supabase.from("payslips").insert(rows);
+    if (error) throw new Error(updated ? `${updated} updated, but adding new payslips failed: ${error.message}` : error.message);
+  }
+
+  return { created: inserts.length, updated };
+}
+
+// ---------------------------------------------------------------------------
+// Attached PDFs
+// ---------------------------------------------------------------------------
+
+export const PAYSLIP_FILES_KEY = ["record-files", "payslip", "batch"] as const;
+
+/** Files attached to many payslips in one query, grouped by payslip id. RLS decides what is visible. */
+export function usePayslipFiles(ids: string[]) {
+  const sorted = [...ids].sort();
+  return useQuery({
+    queryKey: [...PAYSLIP_FILES_KEY, sorted.join(",")],
+    enabled: sorted.length > 0,
+    queryFn: async (): Promise<Map<string, RecordFileRow[]>> => {
+      const out = new Map<string, RecordFileRow[]>();
+      for (let i = 0; i < sorted.length; i += 100) {
+        const { data, error } = await supabase
+          .from("record_files")
+          .select("*")
+          .eq("area", "payslip")
+          .in("entity_id", sorted.slice(i, i + 100))
+          .order("created_at", { ascending: false });
+        if (error) throw error;
+        for (const f of data ?? []) out.set(f.entity_id, [...(out.get(f.entity_id) ?? []), f]);
+      }
+      return out;
+    },
   });
 }
 

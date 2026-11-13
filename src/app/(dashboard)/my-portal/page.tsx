@@ -36,6 +36,7 @@ import {
   Palmtree,
   UserCircle,
   FileSignature,
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatCurrency, formatDate, getStatusColor, getPriorityColor } from "@/lib/utils";
@@ -45,7 +46,8 @@ import { canAccessRoute } from "@/lib/role-access";
 import { useUpdateTask, useProjectsLite } from "@/lib/hooks/use-tasks";
 import { useCreateLeaveRequest } from "@/lib/hooks/use-hr";
 import { useCompanySettings } from "@/lib/hooks/use-company-settings";
-import { useMyPayslips, useMarkPayslipViewed, type Payslip } from "@/lib/hooks/use-payslips";
+import { useMyPayslips, useMarkPayslipViewed, usePayslipFiles, type Payslip } from "@/lib/hooks/use-payslips";
+import { openRecordFile } from "@/lib/hooks/use-record-files";
 import { amountLabel, formatPeriod } from "@/lib/payroll";
 import type {
   EmployeeRow,
@@ -425,6 +427,7 @@ function Portal({ profile }: { profile: SignedInProfile }) {
     [payslipsQ.data]
   );
   const payslipModal = payslips.find((p) => p.id === payslipId) ?? null;
+  const payslipFilesQ = usePayslipFiles(payslips.map((p) => p.id));
 
   const projectName = useMemo(
     () => new Map((projectsQ.data ?? []).map((p) => [p.id, p.name] as const)),
@@ -483,6 +486,38 @@ function Portal({ profile }: { profile: SignedInProfile }) {
   function openPayslip(ps: Payslip) {
     setPayslipId(ps.id);
     if (ps.status === "SENT") markViewed.mutate(ps.id);
+  }
+
+  /** Opens the newest PDF attached to a payslip; downloading counts as viewing it. */
+  async function downloadPayslipPdf(ps: Payslip) {
+    const file = payslipFilesQ.data?.get(ps.id)?.[0];
+    if (!file) return;
+    if (ps.status === "SENT") markViewed.mutate(ps.id);
+    await openRecordFile(file);
+  }
+
+  function renderPdfAction(ps: Payslip, size: "sm" | "lg") {
+    if (payslipFilesQ.isLoading) {
+      return size === "sm" ? <Loader2 className="h-3.5 w-3.5 animate-spin text-gray-300" aria-label="Checking for PDF" /> : null;
+    }
+    if (payslipFilesQ.isError) {
+      return <span className="text-xs text-red-500" title={payslipFilesQ.error.message}>PDF unavailable</span>;
+    }
+    if (!payslipFilesQ.data?.get(ps.id)?.length) return null;
+    return (
+      <button
+        onClick={() => downloadPayslipPdf(ps)}
+        className={cn(
+          "inline-flex items-center justify-center gap-1.5 font-medium transition-colors",
+          size === "sm"
+            ? "rounded-lg bg-gray-100 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-200"
+            : "w-full rounded-xl bg-blue-600 px-4 py-2.5 text-sm text-white hover:bg-blue-700"
+        )}
+      >
+        <Download className={size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4"} />
+        Download PDF
+      </button>
+    );
   }
 
   const leaveDays = workingDays(leaveForm.startDate, leaveForm.endDate);
@@ -907,13 +942,16 @@ function Portal({ profile }: { profile: SignedInProfile }) {
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-6 py-4 text-right">
-                        <button
-                          onClick={() => openPayslip(ps)}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100"
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          View Payslip
-                        </button>
+                        <div className="flex items-center justify-end gap-2">
+                          {renderPdfAction(ps, "sm")}
+                          <button
+                            onClick={() => openPayslip(ps)}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            View Payslip
+                          </button>
+                        </div>
                       </td>
                     </motion.tr>
                   ))}
@@ -1016,7 +1054,8 @@ function Portal({ profile }: { profile: SignedInProfile }) {
                 )}
               </div>
 
-              <div className="mt-6">
+              <div className="mt-6 space-y-2">
+                {renderPdfAction(payslipModal, "lg")}
                 <button
                   onClick={() => setPayslipId(null)}
                   className="w-full rounded-xl bg-gray-100 px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200"

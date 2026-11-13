@@ -155,6 +155,7 @@ inserts/updates to `never`.
 | Meeting AI | ✅ `meetings` table; browser speech-to-text or typed notes, rule-based summary, action items → tasks |
 | TRAXX | ✅ Answers computed from live data (keyword matching, no LLM); reminders are real tasks |
 | Documents | ✅ Upload to a **private** Storage bucket, served via signed URLs |
+| Data uploads | ✅ CSV/XLSX import with column matching + preview (`src/components/data-import/import-dialog.tsx`): payslips, deals, debtors age analysis, payments. File attachments on payslips (PDF), deals, payments and debtors reports in the private `records` bucket (`record_files`) |
 | Settings | ✅ Company profile, my account, security (Clerk) |
 | Client portal (`/portal`) | ✅ Client's own vehicles, jobs, approved inspections, invoices, tickets |
 
