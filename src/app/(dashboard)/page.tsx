@@ -225,7 +225,7 @@ export default function DashboardPage() {
             />
             <Tooltip
               formatter={(value) => [
-                `$${Number(value).toLocaleString()}`,
+                `N$${Number(value).toLocaleString()}`,
                 "Revenue",
               ]}
               contentStyle={{

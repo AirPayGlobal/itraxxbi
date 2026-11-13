@@ -802,7 +802,7 @@ export default function FinancePage() {
                     tickLine={false}
                   />
                   <YAxis
-                    tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
+                    tickFormatter={(v: number) => `N$${(v / 1000).toFixed(0)}k`}
                     tick={{ fontSize: 12, fill: "#64748b" }}
                     axisLine={{ stroke: "#e2e8f0" }}
                     tickLine={false}
@@ -845,7 +845,7 @@ export default function FinancePage() {
                     tickLine={false}
                   />
                   <YAxis
-                    tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
+                    tickFormatter={(v: number) => `N$${(v / 1000).toFixed(0)}k`}
                     tick={{ fontSize: 12, fill: "#64748b" }}
                     axisLine={{ stroke: "#e2e8f0" }}
                     tickLine={false}
@@ -920,7 +920,7 @@ export default function FinancePage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis
                     type="number"
-                    tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
+                    tickFormatter={(v: number) => `N$${(v / 1000).toFixed(0)}k`}
                     tick={{ fontSize: 12, fill: "#64748b" }}
                     axisLine={{ stroke: "#e2e8f0" }}
                     tickLine={false}
