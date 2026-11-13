@@ -7,6 +7,7 @@ import { cn, getInitials } from "@/lib/utils";
 import { ROLES, type Role } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/providers/session-provider";
+import { copyInviteLink } from "@/lib/invite-link";
 import type { TeamMember } from "@/app/api/team/route";
 
 const roleLabels: Record<Role, string> = {
@@ -164,6 +165,21 @@ export default function TeamPage() {
                       {m.status === "invited" ? "Resend invite" : "Send sign-in invite"}
                     </button>
                   )}
+                  {(m.status === "invited" || m.status === "no-login") && (
+                    <button
+                      onClick={async () => {
+                        setBusyKey(m.email);
+                        await copyInviteLink(m.email);
+                        setBusyKey(null);
+                        load();
+                      }}
+                      disabled={busy}
+                      title="Copy the sign-up link to send yourself (WhatsApp, email) if the invitation email doesn't arrive"
+                      className="rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-60"
+                    >
+                      Copy invite link
+                    </button>
+                  )}
                   {!isMe && m.id && (
                     <button
                       onClick={() =>
@@ -278,10 +294,14 @@ function AddEmployeeForm({ onAdded }: { onAdded: () => void }) {
       toast.error(json.error ?? "Could not add the employee.");
       return;
     }
+    const addedEmail = f.email.trim().toLowerCase();
     toast.success(
       `${f.name.trim()} added as ${roleLabels[f.role]}` +
         (json.employeeNumber ? ` (${json.employeeNumber})` : "") +
-        (json.invited ? `. Sign-in invitation sent to ${f.email.trim()}` : "")
+        (json.invited ? `. Sign-in invitation emailed to ${addedEmail}` : ""),
+      json.invited
+        ? { duration: 10000, action: { label: "Copy invite link", onClick: () => copyInviteLink(addedEmail) } }
+        : undefined
     );
     setF({ ...NEW_EMPLOYEE, startDate: new Date().toISOString().slice(0, 10) });
     onAdded();
