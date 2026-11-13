@@ -36,7 +36,7 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1 bg-signal" />
 
         <Link href="/sign-in" className="relative flex items-center">
-          <img src="/logo-dark.svg" alt="iTrackerX — Fleet Data Intelligence" className="h-14 w-auto" />
+          <img src="/brand/itrackerx-logo-on-dark.png" alt="iTrackerX — Fleet Data Intelligence" className="h-14 w-auto" />
         </Link>
         <div className="relative max-w-md">
           <p className="eyebrow text-brand-300">Fleet Data Intelligence</p>
@@ -57,7 +57,7 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
         <div className="flex w-full max-w-md flex-col items-center lg:items-stretch">
           {/* Mobile logo */}
           <div className="mb-8 flex justify-center lg:hidden">
-            <img src="/logo.svg" alt="iTrackerX — Fleet Data Intelligence" className="h-12 w-auto" />
+            <img src="/brand/itrackerx-logo.png" alt="iTrackerX — Fleet Data Intelligence" className="h-12 w-auto" />
           </div>
 
           {title && (

@@ -12,7 +12,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     <div className="min-h-screen bg-slate-50">
       <header className="relative border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3 sm:px-6">
-          <img src="/logo-wordmark.svg" alt="iTrackerX" className="h-8 w-auto" />
+          <img src="/brand/itrackerx-logo.png" alt="iTrackerX" className="h-8 w-auto" />
           <span className="hidden h-6 w-px bg-slate-200 sm:block" />
           <span className="hidden truncate text-sm font-medium text-slate-600 sm:block">
             {company ? company.company || company.name : "Client portal"}
