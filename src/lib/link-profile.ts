@@ -1,6 +1,7 @@
 import "server-only";
 import { clerkClient } from "@clerk/nextjs/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { SUPABASE_URL } from "@/lib/supabase/config";
 
 type LinkedProfile = { id: string; role: string; is_active: boolean };
 
@@ -8,6 +9,7 @@ type LinkedProfile = { id: string; role: string; is_active: boolean };
  * The profile for a Clerk user, linking it on first sign-in. Matching is by Clerk-verified email:
  * first to an existing profile (people from before Clerk, or after moving Clerk instances), then to
  * an admin's invitation, which creates the profile with the invited role. Anyone else gets null.
+ * Throws if an invitation matched but the profile couldn't be created.
  */
 export async function resolveProfile(clerkUserId: string): Promise<LinkedProfile | null> {
   const db = createAdminClient();
@@ -55,9 +57,99 @@ export async function resolveProfile(clerkUserId: string): Promise<LinkedProfile
     .select("id, role, is_active")
     .single();
   if (error) {
-    console.error("Could not create profile from invitation", error);
-    return null;
+    throw new Error(
+      `An invitation exists for ${invite.email} (${invite.role}), but the profile couldn't be created: ${error.message}`
+    );
   }
   await db.from("invitations").update({ accepted_at: new Date().toISOString() }).eq("email", invite.email);
   return created;
+}
+
+export type AccessDiagnosis = {
+  /** The signed-in Clerk account's email addresses, verified ones first. */
+  emails: { address: string; verified: boolean }[];
+  /** The Supabase project the server talks to (its subdomain only). */
+  project: string;
+  reason: "ok" | "not-configured" | "database-error" | "unverified-email" | "not-invited" | "deactivated";
+  detail?: string;
+};
+
+/**
+ * Why a signed-in Clerk user can't get in, for the "No access" page. Retries linking first, so a
+ * fixed invitation or setting takes effect on reload. Reveals nothing the user doesn't already know
+ * beyond the project id (public) and database error text.
+ */
+export async function diagnoseAccess(clerkUserId: string): Promise<AccessDiagnosis> {
+  const user = await (await clerkClient()).users.getUser(clerkUserId);
+  const emails = user.emailAddresses
+    .map((e) => ({ address: e.emailAddress.toLowerCase(), verified: e.verification?.status === "verified" }))
+    .sort((a, b) => Number(b.verified) - Number(a.verified));
+  const project = new URL(SUPABASE_URL).hostname.split(".")[0];
+  const base = { emails, project };
+
+  let db;
+  try {
+    db = createAdminClient();
+  } catch (err) {
+    return { ...base, reason: "not-configured", detail: (err as Error).message };
+  }
+
+  // A cheap query that fails clearly on a wrong key, wrong project or missing schema.
+  const probe = await db.from("profiles").select("id", { count: "exact", head: true });
+  if (probe.error && probe.status === 0) {
+    // supabase-js reports network failures as just "fetch failed"; find the underlying cause.
+    return { ...base, reason: "database-error", detail: `Request to ${new URL(SUPABASE_URL).host} failed. Checks: ${await networkCause()}` };
+  }
+  if (probe.error) {
+    return { ...base, reason: "database-error", detail: `${probe.error.message || probe.error.code || "Request failed"} (HTTP ${probe.status})` };
+  }
+
+  try {
+    const profile = await resolveProfile(clerkUserId);
+    if (profile?.is_active) return { ...base, reason: "ok" };
+    if (profile) return { ...base, reason: "deactivated" };
+  } catch (err) {
+    return { ...base, reason: "database-error", detail: (err as Error).message };
+  }
+
+  if (!emails.some((e) => e.verified)) return { ...base, reason: "unverified-email" };
+
+  return { ...base, reason: "not-invited" };
+}
+
+/** The low-level reason a request to the Supabase API fails (DNS, refused, TLS, timeout, bad header...). */
+async function networkCause(): Promise<string> {
+  const raw = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_KEY ?? "";
+  const source = process.env.SUPABASE_SECRET_KEY
+    ? "SUPABASE_SECRET_KEY"
+    : process.env.SUPABASE_SERVICE_ROLE_KEY
+      ? "SUPABASE_SERVICE_ROLE_KEY"
+      : "SUPABASE_SERVICE_KEY";
+  // Never the key itself: only its kind, length and whether it has characters a header can't carry.
+  const kind = raw.startsWith("sb_secret_") ? "sb_secret_…" : raw.startsWith("eyJ") ? "eyJ… (legacy JWT)" : `starts "${raw.slice(0, 3)}…"`;
+  const bad = /[^\x21-\x7e]/.test(raw) ? `, contains spaces, line breaks or non-ASCII characters` : "";
+  const keyInfo = `key ${source}: ${kind}, ${raw.length} chars${bad}`;
+
+  const attempt = async (headers?: Record<string, string>) => {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/`, { headers, cache: "no-store", signal: AbortSignal.timeout(8000) });
+      return `HTTP ${res.status}`;
+    } catch (err) {
+      const e = err as Error & { cause?: { code?: string; message?: string } };
+      const code = e.cause?.code ?? e.name;
+      const hints: Record<string, string> = {
+        ENOTFOUND: "address doesn't exist (DNS)",
+        EAI_AGAIN: "DNS lookup failed temporarily",
+        ECONNREFUSED: "connection refused",
+        ECONNRESET: "connection reset",
+        UND_ERR_CONNECT_TIMEOUT: "connection timed out",
+        TimeoutError: "timed out",
+      };
+      return `failed: ${hints[code] ?? e.cause?.message ?? e.message} [${code}]`;
+    }
+  };
+
+  const plain = await attempt();
+  const withKey = await attempt({ apikey: raw, Authorization: `Bearer ${raw}` });
+  return `without key ${plain}; with key ${withKey}; ${keyInfo}`;
 }
