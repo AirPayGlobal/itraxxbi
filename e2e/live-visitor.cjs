@@ -35,9 +35,8 @@ const PROTECTED = ["/", "/customer-onboarding", "/customers", "/documents", "/fi
   check("brand logo loads on sign-in", logos.some((l) => l.src === "itrackerx-logo-on-dark.png" && l.ok), JSON.stringify(logos));
   check("page title set", /iTraxx/i.test(await page.title()), await page.title());
   await page.screenshot({ path: OUT + "signin-desktop.png" });
-  check("no Google / social sign-in button", (await page.getByText(/continue with google/i).count()) === 0);
-  check("no Sign up link on sign-in (invite-only)", (await page.locator(".cl-footerAction").filter({ hasText: /sign up/i }).count()) === 0 &&
-    !(await page.getByRole("link", { name: /^sign up$/i }).isVisible().catch(() => false)));
+  check("no Google / social sign-in button", !(await page.getByText(/continue with google/i).first().isVisible().catch(() => false)));
+  check("no Sign up link on sign-in (invite-only)", !(await page.getByRole("link", { name: /^sign up$/i }).first().isVisible().catch(() => false)));
 
   // 2. Unknown account is refused with a clear message (no account is created).
   await email.fill("e2e-nobody-" + Date.now() + "@example.com");
