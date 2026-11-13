@@ -53,6 +53,10 @@ Set these in your host (Vercel, etc.) or in a local `.env.local` (gitignored):
 
 ### 4. Apply the schema
 
+**Automatic (production):** `npm run build` runs `scripts/migrate.mjs` first. On Vercel production builds it applies any new files in `supabase/migrations/` (each in its own transaction) and records them in `supabase_migrations.schema_migrations`. If a migration fails or no connection string is set, the build fails and the previous deployment stays live. It connects with `DATABASE_URL`, or the Vercel Supabase integration's `POSTGRES_URL`. Use the **Session pooler** string, because Vercel can't reach Supabase's IPv6-only direct host. Preview and local builds skip it (force with `MIGRATE=1`).
+
+**Manual:**
+
 Push the migrations in `supabase/migrations/` to the linked project:
 
 ```bash
