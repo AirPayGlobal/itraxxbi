@@ -97,7 +97,7 @@ export async function diagnoseAccess(clerkUserId: string): Promise<AccessDiagnos
   const probe = await db.from("profiles").select("id", { count: "exact", head: true });
   if (probe.error && probe.status === 0) {
     // supabase-js reports network failures as just "fetch failed"; find the underlying cause.
-    return { ...base, reason: "database-error", detail: `Can't reach ${new URL(SUPABASE_URL).host}: ${await networkCause()}` };
+    return { ...base, reason: "database-error", detail: `Request to ${new URL(SUPABASE_URL).host} failed. Checks: ${await networkCause()}` };
   }
   if (probe.error) {
     return { ...base, reason: "database-error", detail: `${probe.error.message || probe.error.code || "Request failed"} (HTTP ${probe.status})` };
@@ -116,23 +116,39 @@ export async function diagnoseAccess(clerkUserId: string): Promise<AccessDiagnos
   return { ...base, reason: "not-invited" };
 }
 
-/** The low-level reason a request to the Supabase API fails (DNS, refused, TLS, timeout...). */
+/** The low-level reason a request to the Supabase API fails (DNS, refused, TLS, timeout, bad header...). */
 async function networkCause(): Promise<string> {
-  try {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/health`, { cache: "no-store", signal: AbortSignal.timeout(8000) });
-    return `a direct request worked (HTTP ${res.status}), so the failure is intermittent; try again`;
-  } catch (err) {
-    const e = err as Error & { cause?: { code?: string; message?: string; hostname?: string } };
-    const code = e.cause?.code;
-    const hints: Record<string, string> = {
-      ENOTFOUND: "the address doesn't exist (DNS). The Supabase project is probably paused or deleted",
-      EAI_AGAIN: "DNS lookup failed temporarily",
-      ECONNREFUSED: "the connection was refused",
-      ECONNRESET: "the connection was reset",
-      UND_ERR_CONNECT_TIMEOUT: "the connection timed out",
-      TimeoutError: "the request timed out",
-    };
-    const name = code ?? e.name;
-    return `${hints[name] ?? e.cause?.message ?? e.message} [${name}]`;
-  }
+  const raw = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_KEY ?? "";
+  const source = process.env.SUPABASE_SECRET_KEY
+    ? "SUPABASE_SECRET_KEY"
+    : process.env.SUPABASE_SERVICE_ROLE_KEY
+      ? "SUPABASE_SERVICE_ROLE_KEY"
+      : "SUPABASE_SERVICE_KEY";
+  // Never the key itself: only its kind, length and whether it has characters a header can't carry.
+  const kind = raw.startsWith("sb_secret_") ? "sb_secret_…" : raw.startsWith("eyJ") ? "eyJ… (legacy JWT)" : `starts "${raw.slice(0, 3)}…"`;
+  const bad = /[^\x21-\x7e]/.test(raw) ? `, contains spaces, line breaks or non-ASCII characters` : "";
+  const keyInfo = `key ${source}: ${kind}, ${raw.length} chars${bad}`;
+
+  const attempt = async (headers?: Record<string, string>) => {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/`, { headers, cache: "no-store", signal: AbortSignal.timeout(8000) });
+      return `HTTP ${res.status}`;
+    } catch (err) {
+      const e = err as Error & { cause?: { code?: string; message?: string } };
+      const code = e.cause?.code ?? e.name;
+      const hints: Record<string, string> = {
+        ENOTFOUND: "address doesn't exist (DNS)",
+        EAI_AGAIN: "DNS lookup failed temporarily",
+        ECONNREFUSED: "connection refused",
+        ECONNRESET: "connection reset",
+        UND_ERR_CONNECT_TIMEOUT: "connection timed out",
+        TimeoutError: "timed out",
+      };
+      return `failed: ${hints[code] ?? e.cause?.message ?? e.message} [${code}]`;
+    }
+  };
+
+  const plain = await attempt();
+  const withKey = await attempt({ apikey: raw, Authorization: `Bearer ${raw}` });
+  return `without key ${plain}; with key ${withKey}; ${keyInfo}`;
 }
