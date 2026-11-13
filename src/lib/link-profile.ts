@@ -1,6 +1,7 @@
 import "server-only";
 import { clerkClient } from "@clerk/nextjs/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { SUPABASE_URL } from "@/lib/supabase/config";
 
 type LinkedProfile = { id: string; role: string; is_active: boolean };
 
@@ -8,6 +9,7 @@ type LinkedProfile = { id: string; role: string; is_active: boolean };
  * The profile for a Clerk user, linking it on first sign-in. Matching is by Clerk-verified email:
  * first to an existing profile (people from before Clerk, or after moving Clerk instances), then to
  * an admin's invitation, which creates the profile with the invited role. Anyone else gets null.
+ * Throws if an invitation matched but the profile couldn't be created.
  */
 export async function resolveProfile(clerkUserId: string): Promise<LinkedProfile | null> {
   const db = createAdminClient();
@@ -54,9 +56,58 @@ export async function resolveProfile(clerkUserId: string): Promise<LinkedProfile
     .select("id, role, is_active")
     .single();
   if (error) {
-    console.error("Could not create profile from invitation", error);
-    return null;
+    throw new Error(
+      `An invitation exists for ${invite.email} (${invite.role}), but the profile couldn't be created: ${error.message}`
+    );
   }
   await db.from("invitations").update({ accepted_at: new Date().toISOString() }).eq("email", invite.email);
   return created;
+}
+
+export type AccessDiagnosis = {
+  /** The signed-in Clerk account's email addresses, verified ones first. */
+  emails: { address: string; verified: boolean }[];
+  /** The Supabase project the server talks to (its subdomain only). */
+  project: string;
+  reason: "ok" | "not-configured" | "database-error" | "unverified-email" | "not-invited" | "deactivated";
+  detail?: string;
+};
+
+/**
+ * Why a signed-in Clerk user can't get in, for the "No access" page. Retries linking first, so a
+ * fixed invitation or setting takes effect on reload. Reveals nothing the user doesn't already know
+ * beyond the project id (public) and database error text.
+ */
+export async function diagnoseAccess(clerkUserId: string): Promise<AccessDiagnosis> {
+  const user = await (await clerkClient()).users.getUser(clerkUserId);
+  const emails = user.emailAddresses
+    .map((e) => ({ address: e.emailAddress.toLowerCase(), verified: e.verification?.status === "verified" }))
+    .sort((a, b) => Number(b.verified) - Number(a.verified));
+  const project = new URL(SUPABASE_URL).hostname.split(".")[0];
+  const base = { emails, project };
+
+  let db;
+  try {
+    db = createAdminClient();
+  } catch (err) {
+    return { ...base, reason: "not-configured", detail: (err as Error).message };
+  }
+
+  // A cheap query that fails clearly on a wrong key, wrong project or missing schema.
+  const probe = await db.from("profiles").select("id", { count: "exact", head: true });
+  if (probe.error) {
+    return { ...base, reason: "database-error", detail: `${probe.error.message || probe.error.code || "Request failed"} (HTTP ${probe.status})` };
+  }
+
+  try {
+    const profile = await resolveProfile(clerkUserId);
+    if (profile?.is_active) return { ...base, reason: "ok" };
+    if (profile) return { ...base, reason: "deactivated" };
+  } catch (err) {
+    return { ...base, reason: "database-error", detail: (err as Error).message };
+  }
+
+  if (!emails.some((e) => e.verified)) return { ...base, reason: "unverified-email" };
+
+  return { ...base, reason: "not-invited" };
 }

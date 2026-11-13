@@ -16,7 +16,11 @@ export default clerkMiddleware(async (auth, req) => {
   if (pathname.startsWith("/api/")) return;
 
   // Pages follow the same role rules as the sidebar; the database enforces data access separately.
-  const profile = await resolveProfile(userId);
+  // A misconfigured server (missing key, unreachable database) sends people to /no-access, which explains it.
+  const profile = await resolveProfile(userId).catch((err) => {
+    console.error("Could not resolve profile", err);
+    return null;
+  });
   if (!profile?.is_active) return NextResponse.redirect(new URL("/no-access", req.url));
   if (!canAccessRoute(profile.role, pathname)) return NextResponse.redirect(new URL("/", req.url));
 },
