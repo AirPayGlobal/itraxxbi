@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Mail, Send, UserCheck, UserX, X } from "lucide-react";
+import { Link2, Loader2, Mail, Send, UserCheck, UserX, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/providers/session-provider";
 import type { PortalUser } from "@/app/api/customers/[id]/portal-users/route";
+import { copyInviteLink } from "@/lib/invite-link";
 
 const statusStyle: Record<PortalUser["status"], string> = {
   active: "bg-emerald-50 text-emerald-700",
@@ -166,6 +167,13 @@ export function PortalAccess({ customerId, defaultEmail }: { customerId: string;
                       }
                     >
                       <Mail className="h-4 w-4" />
+                    </IconButton>
+                    <IconButton title="Copy invitation link (send it yourself if the email doesn't arrive)" busy={busy === `link:${u.email}`} onClick={async () => {
+                      setBusy(`link:${u.email}`);
+                      await copyInviteLink(u.email);
+                      setBusy(null);
+                    }}>
+                      <Link2 className="h-4 w-4" />
                     </IconButton>
                     {u.id === null && (
                       <IconButton
