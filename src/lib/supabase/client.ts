@@ -2,7 +2,23 @@ import { createClient as createSupabaseClient, type SupabaseClient } from "@supa
 import type { Database } from "./database.types";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config";
 
-type ClerkWindow = Window & { Clerk?: { session?: { getToken: () => Promise<string | null> } | null } };
+type ClerkWindow = Window & {
+  Clerk?: { loaded?: boolean; session?: { getToken: () => Promise<string | null> } | null };
+};
+
+/**
+ * Clerk loads asynchronously. Queries that start on page load must wait for it; otherwise they go out
+ * without a token, row-level security returns nothing, and the page caches an empty result.
+ */
+async function clerkReady(timeoutMs = 10_000): Promise<ClerkWindow["Clerk"] | null> {
+  const w = window as ClerkWindow;
+  const start = Date.now();
+  while (!w.Clerk?.loaded) {
+    if (Date.now() - start > timeoutMs) return w.Clerk ?? null;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  return w.Clerk;
+}
 
 let browserClient: SupabaseClient<Database> | null = null;
 
@@ -15,7 +31,8 @@ export function createClient(): SupabaseClient<Database> {
     browserClient = createSupabaseClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
       accessToken: async () => {
         if (typeof window === "undefined") return null;
-        return (await (window as ClerkWindow).Clerk?.session?.getToken()) ?? null;
+        const clerk = await clerkReady();
+        return (await clerk?.session?.getToken()) ?? null;
       },
     });
   }

@@ -40,9 +40,22 @@ export async function POST(request: NextRequest) {
     // Pending invitations, plus people who had accounts before Clerk and haven't signed in with it yet.
     const [{ data: inv }, { data: unlinked }] = await Promise.all([
       db.from("invitations").select("email").eq("email", email).maybeSingle(),
-      db.from("profiles").select("id").eq("email", email).is("clerk_user_id", null).maybeSingle(),
+      db.from("profiles").select("id, name, role, department, job_title").eq("email", email).is("clerk_user_id", null).maybeSingle(),
     ]);
     if (!inv && !unlinked) return fail("There's no pending invitation for that email.", 404);
+    // Employees added without a login: record the invitation so the team list shows them as invited.
+    if (!inv && unlinked && unlinked.role !== "CLIENT") {
+      await db.from("invitations").upsert({
+        email,
+        name: unlinked.name,
+        role: unlinked.role,
+        department: unlinked.department,
+        job_title: unlinked.job_title,
+        invited_by: admin.id,
+        accepted_at: null,
+        customer_id: null,
+      });
+    }
   } else {
     const name = body.name?.trim() ?? "";
     const role = body.role as Role;
