@@ -7,7 +7,7 @@ export const roleAccess: Record<string, string[]> = {
   ],
   MANAGER: [
     "/", "/projects", "/tasks", "/jobcards", "/inspections", "/tickets",
-    "/customers", "/customer-onboarding", "/staff", "/hr", "/documents",
+    "/customers", "/customer-onboarding", "/staff", "/hr", "/payslips", "/documents",
     "/inventory", "/finance", "/sales-pipeline", "/my-portal", "/meeting-ai",
     "/traxx",
   ],
@@ -16,7 +16,7 @@ export const roleAccess: Record<string, string[]> = {
     "/documents", "/inventory", "/my-portal",
   ],
   STAFF: [
-    "/", "/tasks", "/tickets", "/documents", "/hr", "/my-portal", "/payslips",
+    "/", "/tasks", "/tickets", "/documents", "/hr", "/my-portal",
   ],
   VIEWER: [
     "/", "/projects", "/tasks", "/jobcards", "/customers", "/finance",

@@ -158,3 +158,16 @@ begin
                     for each row execute function public.set_updated_at()', t);
   end loop;
 end $$;
+
+-- ---- Leave: staff request their own leave ------------------------------------
+-- Managers already manage all leave; everyone else may only file a pending
+-- request for themselves (approval stays with managers).
+drop policy if exists "staff request own leave" on public.leave_requests;
+create policy "staff request own leave" on public.leave_requests for insert to authenticated
+  with check (
+    public.is_active_member()
+    and user_id = public.current_profile_id()
+    and status = 'PENDING'
+    and approved_by_id is null
+    and approved_at is null
+  );
