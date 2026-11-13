@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useSyncExternalStore } from "react";
 import Link from "next/link";
 import {
   Bot,
@@ -81,6 +81,8 @@ function getGreeting(): string {
   if (hour < 17) return "Good afternoon";
   return "Good evening";
 }
+
+const subscribeNoop = () => () => {};
 
 let msgCounter = 0;
 function newId(prefix: string): string {
@@ -230,7 +232,10 @@ export default function TraxxAIPage() {
   const unread = notifications.filter((n) => !n.is_read);
   const reminderCount = unread.length + (myOverdue.length > 0 ? 1 : 0);
 
-  const shownMessages = messages.length ? messages : [welcomeMessage(profile?.name)];
+  // The greeting and timestamps depend on the viewer's clock, so build them only in the browser
+  // (the server renders in UTC, which would not match and breaks hydration).
+  const inBrowser = useSyncExternalStore(subscribeNoop, () => true, () => false);
+  const shownMessages = messages.length ? messages : inBrowser ? [welcomeMessage(profile?.name)] : [];
   const showSuggestions = messages.length === 0;
 
   // --- Effects ---
