@@ -41,7 +41,8 @@ const FIELDS: ImportField[] = [
   {
     key: "account_number",
     label: "Account number",
-    aliases: ["account number", "account no", "acc no", "account", "acc", "account code", "customer code", "debtor code", "code"],
+    // No bare "account"/"code": partial matching would grab "Account Name".
+    aliases: ["account number", "account no", "acc no", "acc number", "account code", "customer code", "debtor code", "customer account"],
     example: "C0001",
   },
   {
@@ -51,14 +52,14 @@ const FIELDS: ImportField[] = [
     aliases: ["customer name", "debtor name", "account name", "name", "customer", "debtor", "client", "client name"],
     example: "Example Logistics (Pty) Ltd",
   },
-  { key: "current_amount", label: "Current", aliases: ["current", "current amount", "not due", "0-30 days", "0 days"], example: "12500.00" },
-  { key: "days_30", label: "30 days", aliases: ["30 days", "30", "31-60 days", "30 day", "1 month", "30+"], example: "4200.00" },
-  { key: "days_60", label: "60 days", aliases: ["60 days", "60", "61-90 days", "60 day", "2 months", "60+"], example: "0.00" },
-  { key: "days_90", label: "90 days", aliases: ["90 days", "90", "91-120 days", "90 day", "3 months", "90+"], example: "1500.00" },
+  { key: "current_amount", label: "Current", aliases: ["current", "current amount", "not due", "0-30"], example: "12500.00" },
+  { key: "days_30", label: "30 days", aliases: ["30 days", "30", "31-60", "30 day", "1 month"], example: "4200.00" },
+  { key: "days_60", label: "60 days", aliases: ["60 days", "60", "61-90", "60 day", "2 months"], example: "0.00" },
+  { key: "days_90", label: "90 days", aliases: ["90 days", "90", "91-120", "90 day", "3 months"], example: "1500.00" },
   {
     key: "days_120_plus",
     label: "120+ days",
-    aliases: ["120+ days", "120 days", "120+", "over 120", "120 days+", "120 plus", "121+ days", "150 days", "150+", "4 months", "older"],
+    aliases: ["120+ days", "120 days", "120+", "over 120", "120 plus", "121+", "150 days", "150+", "4 months", "older"],
     example: "800.00",
   },
   { key: "total", label: "Total", aliases: ["total", "total due", "total outstanding", "balance", "outstanding", "amount due"], example: "19000.00" },

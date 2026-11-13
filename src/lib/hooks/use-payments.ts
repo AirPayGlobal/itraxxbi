@@ -29,11 +29,11 @@ export function parseMethod(raw: string): PaymentMethod {
   if (!s) return "BANK_TRANSFER";
   const exact = PAYMENT_METHODS.find((m) => m.value.toLowerCase() === s.replace(/[\s-]+/g, "_") || m.label.toLowerCase() === s);
   if (exact) return exact.value;
-  if (/cheque|check|chq/.test(s)) return "CHEQUE";
+  if (/cheque|\bcheck\b|\bchq\b/.test(s)) return "CHEQUE";
   if (/cash/.test(s)) return "CASH";
-  if (/card|pos|visa|master/.test(s)) return "CARD";
-  if (/mobile|wallet|momo|mpesa|m-pesa|easy ?wallet|blue ?wallet|paytoday/.test(s)) return "MOBILE_PAYMENT";
-  if (/eft|transfer|bank|deposit|rtgs|swift|internet|online/.test(s)) return "BANK_TRANSFER";
+  if (/card|\bpos\b|visa|mastercard/.test(s)) return "CARD";
+  if (/mobile|wallet|momo|m-?pesa|paytoday/.test(s)) return "MOBILE_PAYMENT";
+  if (/\beft\b|transfer|bank|deposit|rtgs|swift|internet|online/.test(s)) return "BANK_TRANSFER";
   return "OTHER";
 }
 

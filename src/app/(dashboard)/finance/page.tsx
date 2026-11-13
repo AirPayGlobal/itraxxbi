@@ -55,6 +55,9 @@ import type {
   InvoiceStatus,
   ExpenseCategory,
 } from "@/lib/supabase/database.types";
+import { useAuth } from "@/components/providers/session-provider";
+import { DebtorsTab } from "@/components/finance/debtors-tab";
+import { PaymentsTab } from "@/components/finance/payments-tab";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -83,7 +86,7 @@ const emptyExpenseForm = {
 };
 
 const statusFilters = ["All", "Draft", "Sent", "Paid", "Overdue", "Partial"] as const;
-const tabs = ["Invoices", "Expenses", "Reports"] as const;
+const tabs = ["Invoices", "Expenses", "Debtors", "Payments", "Reports"] as const;
 
 // ---------------------------------------------------------------------------
 // Invoice form
@@ -106,6 +109,9 @@ const initialInvoiceForm = {
 // ---------------------------------------------------------------------------
 
 export default function FinancePage() {
+  const { profile } = useAuth();
+  // Finance uploads, matching and deletes are for admins and managers; viewers only read.
+  const canEditFinance = profile?.role === "ADMIN" || profile?.role === "MANAGER";
   const { data: invoices = [], isLoading, isError, error } = useInvoices();
   const { data: customers = [] } = useCustomers();
   const createInvoice = useCreateInvoice();
@@ -356,7 +362,7 @@ export default function FinancePage() {
             Financial Management
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Invoices, expenses, and financial reporting
+            Invoices, expenses, debtors, payments and financial reporting
           </p>
         </div>
         <button
@@ -451,7 +457,7 @@ export default function FinancePage() {
 
       {/* Tabs */}
       <div className="mb-6 border-b border-slate-200">
-        <nav className="-mb-px flex gap-6">
+        <nav className="-mb-px flex gap-6 overflow-x-auto">
           {tabs.map((tab) => (
             <button
               key={tab}
@@ -461,7 +467,7 @@ export default function FinancePage() {
                 setStatusFilter("All");
               }}
               className={cn(
-                "border-b-2 pb-3 text-sm font-medium transition-colors",
+                "whitespace-nowrap border-b-2 pb-3 text-sm font-medium transition-colors",
                 activeTab === tab
                   ? "border-blue-600 text-blue-600"
                   : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700"
@@ -796,6 +802,12 @@ export default function FinancePage() {
           </div>
         </>
       )}
+
+      {/* Debtors Tab */}
+      {activeTab === "Debtors" && <DebtorsTab canEdit={canEditFinance} />}
+
+      {/* Payments Tab */}
+      {activeTab === "Payments" && <PaymentsTab canEdit={canEditFinance} />}
 
       {/* Reports Tab */}
       {/* TODO: expenses not yet wired to Supabase */}
