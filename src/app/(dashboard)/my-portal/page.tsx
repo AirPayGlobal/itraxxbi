@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -212,6 +212,8 @@ function initials(name: string): string {
     .slice(0, 2)
     .toUpperCase();
 }
+
+const subscribeNoop = () => () => {};
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -517,6 +519,8 @@ function Portal({ profile }: { profile: SignedInProfile }) {
     );
   }
 
+  // Greeting and date follow the viewer's clock; the server renders in UTC.
+  const inBrowser = useSyncExternalStore(subscribeNoop, () => true, () => false);
   const todayFormatted = new Intl.DateTimeFormat("en-US", {
     weekday: "long",
     year: "numeric",
@@ -542,9 +546,9 @@ function Portal({ profile }: { profile: SignedInProfile }) {
           <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="text-2xl font-bold">
-                {getGreeting()}, {firstName}
+                {inBrowser ? `${getGreeting()}, ` : "Welcome, "}{firstName}
               </h2>
-              <p className="mt-1 text-blue-100">{todayFormatted}</p>
+              <p className="mt-1 text-blue-100">{inBrowser ? todayFormatted : "\u00a0"}</p>
             </div>
             {roleLine && (
               <div className="mt-4 flex items-center gap-2 md:mt-0">
