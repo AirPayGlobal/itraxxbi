@@ -300,6 +300,80 @@ export function useUpdateEscalation() {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Bulk import
+// ---------------------------------------------------------------------------
+
+/** A deal ready to insert from a spreadsheet row, optionally linked to an existing customer. */
+export type DealImportRecord = DealInput & {
+  stage: DealStage;
+  probability: number;
+  customer_id: string | null;
+  /** Display only (preview); not saved. */
+  owner_label: string;
+  customer_label: string | null;
+};
+
+/** Case-insensitive key used to spot a deal that already exists ("same title at the same company"). */
+export const dealKey = (title: string, company: string) =>
+  `${title.trim().toLowerCase().replace(/\s+/g, " ")}|${company.trim().toLowerCase().replace(/\s+/g, " ")}`;
+
+/** Fresh lookups for validating an import: existing deal keys and customers to link by company name. */
+export async function fetchDealImportLookups(): Promise<{
+  existingKeys: Set<string>;
+  customers: { id: string; name: string; company: string | null }[];
+}> {
+  const [dealsRes, customersRes] = await Promise.all([
+    supabase.from("deals").select("title, company"),
+    supabase.from("customers").select("id, name, company"),
+  ]);
+  if (dealsRes.error) throw dealsRes.error;
+  if (customersRes.error) throw customersRes.error;
+  return {
+    existingKeys: new Set((dealsRes.data ?? []).map((d) => dealKey(d.title, d.company))),
+    customers: (customersRes.data ?? []) as { id: string; name: string; company: string | null }[],
+  };
+}
+
+/** Inserts imported deals in batches; returns how many were saved. */
+export function useImportDeals() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (records: DealImportRecord[]): Promise<number> => {
+      const now = new Date().toISOString();
+      const rows = records.map((r) => ({
+        title: r.title,
+        company: r.company,
+        contact_name: r.contact_name ?? null,
+        contact_email: r.contact_email ?? null,
+        contact_phone: r.contact_phone ?? null,
+        value: r.value ?? 0,
+        fleet_size: r.fleet_size ?? null,
+        stage: r.stage,
+        probability: r.probability,
+        owner_id: r.owner_id ?? null,
+        expected_close: r.expected_close ?? null,
+        source: r.source ?? null,
+        notes: r.notes ?? null,
+        customer_id: r.customer_id,
+        escalations: [],
+        last_activity_at: now,
+      }));
+      let saved = 0;
+      for (let i = 0; i < rows.length; i += 200) {
+        const { error } = await supabase.from("deals").insert(rows.slice(i, i + 200));
+        if (error) {
+          if (saved) qc.invalidateQueries({ queryKey: KEY });
+          throw new Error(saved ? `${error.message} (${saved} deals were saved before the error)` : error.message);
+        }
+        saved += Math.min(200, rows.length - i);
+      }
+      return saved;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
+  });
+}
+
 const ONBOARDING_ORDER: OnboardingStage[] = [
   "INQUIRY",
   "PROPOSAL",

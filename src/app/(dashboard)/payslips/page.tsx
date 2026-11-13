@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -25,14 +27,26 @@ import {
   Loader2,
   RefreshCw,
   ShieldAlert,
+  Upload,
+  FileUp,
+  Paperclip,
+  CheckCircle2,
 } from "lucide-react";
+import { ImportDialog } from "@/components/data-import/import-dialog";
+import { RecordFiles } from "@/components/files/record-files";
+import { uploadRecordFile } from "@/lib/hooks/use-record-files";
+import { PAYSLIP_IMPORT_FIELDS, matchPdfToPayslip, type PayslipImportRecord } from "@/lib/import/payslip-import";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { useAuth } from "@/components/providers/session-provider";
 import { useCompanySettings } from "@/lib/hooks/use-company-settings";
 import {
+  PAYSLIP_FILES_KEY,
+  checkPayslipImport,
+  importPayslips,
   useGeneratePayslips,
   useMarkPayslipsSent,
   usePayrollPeople,
+  usePayslipFiles,
   usePayslipPeriods,
   usePayslipsForPeriod,
   useUpdatePayslip,
@@ -130,6 +144,9 @@ function PayrollAdmin() {
   const [generateYear, setGenerateYear] = useState(() => new Date().getFullYear());
   const [viewId, setViewId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
+  const [showImport, setShowImport] = useState(false);
+  const [showPdfUpload, setShowPdfUpload] = useState(false);
+  const qc = useQueryClient();
 
   const periodsQ = usePayslipPeriods();
   const peopleQ = usePayrollPeople();
@@ -149,6 +166,20 @@ function PayrollAdmin() {
     () => new Map((peopleQ.data ?? []).map((p) => [p.id, p] as const)),
     [peopleQ.data]
   );
+
+  const filesQ = usePayslipFiles(periodPayslips.map((p) => p.id));
+  const filesByPayslip = filesQ.data;
+
+  async function runImport(records: PayslipImportRecord[]): Promise<string> {
+    const { created, updated } = await importPayslips(records);
+    qc.invalidateQueries({ queryKey: ["payslips"] });
+    const periodsImported = [...new Set(records.map((r) => r.period))];
+    if (periodsImported.length === 1) setChosenPeriod(periodsImported[0]);
+    const parts = [];
+    if (created) parts.push(`${created} payslip${created === 1 ? "" : "s"} imported`);
+    if (updated) parts.push(`${updated} updated`);
+    return parts.join(", ") || "Nothing to import";
+  }
 
   const viewPayslip = periodPayslips.find((p) => p.id === viewId) ?? null;
   const editPayslip = periodPayslips.find((p) => p.id === editId) ?? null;
@@ -236,6 +267,22 @@ function PayrollAdmin() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => setShowImport(true)}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+          >
+            <Upload className="h-4 w-4" />
+            Import Payslips
+          </button>
+          <button
+            onClick={() => setShowPdfUpload(true)}
+            disabled={tableLoading || periodPayslips.length === 0}
+            title={periodPayslips.length === 0 ? "No payslips in this period to attach PDFs to" : undefined}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <FileUp className="h-4 w-4" />
+            Upload PDFs
+          </button>
           <button
             onClick={() => setShowGenerateModal(true)}
             className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
@@ -386,7 +433,12 @@ function PayrollAdmin() {
                         </div>
                         <div>
                           <p className="text-sm font-medium text-slate-900">{name}</p>
-                          <p className="text-xs text-slate-400">{ps.payslip_number}</p>
+                          <p className="flex items-center gap-1 text-xs text-slate-400">
+                            {ps.payslip_number}
+                            {filesByPayslip?.get(ps.id)?.length ? (
+                              <Paperclip className="h-3 w-3 text-blue-500" aria-label="PDF attached" />
+                            ) : null}
+                          </p>
                         </div>
                       </div>
                     </td>
@@ -448,7 +500,7 @@ function PayrollAdmin() {
                 <tr>
                   <td colSpan={8} className="px-6 py-12 text-center text-sm text-slate-500">
                     No payslips for {formatPeriod(selectedPeriod)} yet. Click &quot;Generate
-                    Payslips&quot; to create them.
+                    Payslips&quot; to create them, or &quot;Import Payslips&quot; to load a payroll export.
                   </td>
                 </tr>
               )}
@@ -548,7 +600,10 @@ function PayrollAdmin() {
           <PayslipDetailModal
             payslip={viewPayslip}
             person={peopleById.get(viewPayslip.user_id)}
-            onClose={() => setViewId(null)}
+            onClose={() => {
+              setViewId(null);
+              qc.invalidateQueries({ queryKey: PAYSLIP_FILES_KEY });
+            }}
             onEdit={() => {
               setViewId(null);
               setEditId(viewPayslip.id);
