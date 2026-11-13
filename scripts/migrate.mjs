@@ -21,16 +21,30 @@ if (!isProduction && !forced) {
   process.exit(0);
 }
 
+const files = (await readdir(DIR)).filter((f) => /^\d{14}_.+\.sql$/.test(f)).sort();
+// Migrations newer than the hand-applied baseline must reach the database before this code goes live.
+const newer = files.filter((f) => f.slice(0, 14) > BASELINE);
+
+/** Without database access, only block the deploy when there is something it would need to apply. */
+function unreachable(message) {
+  if (newer.length > 0) {
+    console.error(`[migrate] ${message}`);
+    console.error(`[migrate] Not deploying: ${newer.join(", ")} must be applied first.`);
+    process.exit(1);
+  }
+  console.warn(`[migrate] ${message} No new migrations in this build, so continuing.`);
+  process.exit(0);
+}
+
 // Prefer an explicit DATABASE_URL, then the Vercel Supabase integration's pooled URL (IPv4), then direct.
 const url = [process.env.DATABASE_URL, process.env.POSTGRES_URL, process.env.POSTGRES_URL_NON_POOLING]
   .map((v) => v?.trim())
   .find(Boolean);
 if (!url) {
-  console.error(
-    "[migrate] No database connection string. Add DATABASE_URL in Vercel (Production) with the Supabase " +
+  unreachable(
+    "No database connection string. Add DATABASE_URL in Vercel (Production) with the Supabase " +
       "Session pooler string: Supabase → Connect → Session pooler."
   );
-  process.exit(1);
 }
 
 function connectionConfig(raw) {
@@ -43,11 +57,15 @@ function connectionConfig(raw) {
   return { connectionString: u.toString(), ssl: local ? false : { rejectUnauthorized: false } };
 }
 
-const files = (await readdir(DIR)).filter((f) => /^\d{14}_.+\.sql$/.test(f)).sort();
 const client = new pg.Client({ ...connectionConfig(url), connectionTimeoutMillis: 15000 });
 
 try {
   await client.connect();
+} catch (err) {
+  unreachable(`Can't connect to ${new URL(url).hostname}: ${err.message}.`);
+}
+
+try {
   console.log(`[migrate] Connected to ${new URL(url).hostname}.`);
 
   await client.query(`
