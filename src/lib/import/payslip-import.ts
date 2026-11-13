@@ -78,8 +78,8 @@ export function indexPeople(people: ImportPerson[]): PersonIndex {
 }
 
 /** Email first, then employee number, then exact full name. Each value is tried against all three. */
-function findPerson(idx: PersonIndex, values: string[]): { person: ImportPerson } | { error: string } {
-  const given = values.map((v) => v.trim()).filter(Boolean);
+function findPerson(idx: PersonIndex, values: (string | undefined)[]): { person: ImportPerson } | { error: string } {
+  const given = values.map((v) => (v ?? "").trim()).filter(Boolean);
   if (!given.length) return { error: "No employee email, number or name on this row" };
   for (const v of given) {
     const hit = idx.byEmail.get(squash(v));
@@ -110,7 +110,7 @@ export function checkPayslipRows(
   existing: ExistingPayslip[]
 ): RowCheck<PayslipImportRecord>[] {
   const idx = indexPeople(people);
-  const existingByKey = new Map(existing.map((e) => [`${e.user_id}|${e.period}`, e] as const));
+  const existingByKey = new Map<string, ExistingPayslip>(existing.map((e) => [`${e.user_id}|${e.period}`, e]));
   const seen = new Map<string, number>();
 
   return rows.map((row): RowCheck<PayslipImportRecord> => {
