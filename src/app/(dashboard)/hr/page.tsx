@@ -942,6 +942,13 @@ export default function HRPage() {
                       Every user already has an employee record.
                     </p>
                   )}
+                  <p className="mt-1 text-xs text-gray-500">
+                    Adding someone new? Use{" "}
+                    <a href="/settings/team" className="font-medium text-blue-600 hover:underline">
+                      Settings → Team &amp; access → Add employee
+                    </a>{" "}
+                    to choose their role and record their employment details in one step.
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

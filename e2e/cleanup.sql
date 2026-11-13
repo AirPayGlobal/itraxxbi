@@ -11,3 +11,15 @@ delete from public.invitations where email like 'e2e.%@example.com';
 delete from public.profiles where email like 'e2e.%@example.com';
 delete from public.customers where name like 'E2E Test Co%';
 commit;
+
+-- Data uploads (live-uploads.cjs)
+begin;
+delete from storage.objects where bucket_id = 'records' and name in (
+  select path from public.record_files where file_name like 'E2E-%' or entity_id in (select id from public.deals where title like 'E2E %'));
+delete from public.record_files where file_name like 'E2E-%' or entity_id in (select id from public.deals where title like 'E2E %');
+delete from public.debtor_age_reports where id in (select report_id from public.debtor_age_lines where customer_name like 'E2E Debtor %');
+delete from public.payments where reference like 'E2E %' or payer_name like 'E2E %';
+delete from public.payslips where user_id in (select id from public.profiles where email like 'e2e.%@example.com');
+delete from public.employees where user_id in (select id from public.profiles where email like 'e2e.%@example.com');
+delete from public.deals where title like 'E2E %';
+commit;

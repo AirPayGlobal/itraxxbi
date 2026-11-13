@@ -35,6 +35,8 @@ function clerk(pathname, method = "GET", body) {
       ["meetings", "title=like.E2E%20*"],
       ["invitations", "email=like.e2e.*%40example.com"],
       ["profiles", "email=like.e2e.*%40example.com&role=eq.CLIENT"],
+      ["debtor_age_reports", "file_name=like.debtors.csv"],
+      ["payments", "reference=like.E2E%20*"],
     ];
     const log = await page.evaluate(async ({ SUPABASE, KEY, steps }) => {
       const jwt = await window.Clerk.session.getToken();

@@ -8,7 +8,9 @@ export type TeamMember = {
   name: string;
   role: string;
   department: string | null;
-  status: "active" | "invited" | "deactivated";
+  /** "no-login": added as an employee without a sign-in invitation (yet). */
+  status: "active" | "invited" | "no-login" | "deactivated";
+  job_title: string | null;
 };
 
 /** Everyone with a profile plus invitations nobody has accepted yet. Admin only. */
@@ -26,19 +28,21 @@ export async function GET() {
 
   const [profiles, invitations] = await Promise.all([
     // Client users are managed per customer on the Customers page.
-    db.from("profiles").select("id, email, name, role, department, is_active, clerk_user_id").neq("role", "CLIENT").order("name"),
-    db.from("invitations").select("email, name, role, department").neq("role", "CLIENT"),
+    db.from("profiles").select("id, email, name, role, department, job_title, is_active, clerk_user_id").neq("role", "CLIENT").order("name"),
+    db.from("invitations").select("email, name, role, department, job_title").neq("role", "CLIENT"),
   ]);
   if (profiles.error) return NextResponse.json({ ok: false, error: profiles.error.message }, { status: 500 });
 
   // Someone is active once their profile is linked to a Clerk account (their first sign-in).
+  const invitedEmails = new Set((invitations.data ?? []).map((i) => i.email));
   const members: TeamMember[] = (profiles.data ?? []).map((p) => ({
     id: p.id,
     email: p.email,
     name: p.name,
     role: p.role,
     department: p.department,
-    status: !p.is_active ? "deactivated" : p.clerk_user_id ? "active" : "invited",
+    job_title: p.job_title,
+    status: !p.is_active ? "deactivated" : p.clerk_user_id ? "active" : invitedEmails.has(p.email) ? "invited" : "no-login",
   }));
 
   const known = new Set(members.map((m) => m.email));
@@ -47,7 +51,7 @@ export async function GET() {
   for (const c of clients ?? []) known.add(c.email);
   for (const inv of invitations.data ?? []) {
     if (!known.has(inv.email)) {
-      members.push({ id: null, email: inv.email, name: inv.name, role: inv.role, department: inv.department, status: "invited" });
+      members.push({ id: null, email: inv.email, name: inv.name, role: inv.role, department: inv.department, job_title: inv.job_title, status: "invited" });
     }
   }
 
