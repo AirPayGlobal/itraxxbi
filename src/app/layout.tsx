@@ -52,7 +52,8 @@ export default function RootLayout({
               borderRadius: "0.5rem",
             },
             // Email and password only: no Google or other social sign-in buttons anywhere.
-            elements: { socialButtonsRoot: "hidden", socialButtons: "hidden", dividerRow: "hidden" },
+            // Style objects, not class names: Clerk's own styles outrank Tailwind's layered utilities.
+            elements: { socialButtonsRoot: { display: "none" }, dividerRow: { display: "none" } },
           }}
         >
         <AuthSessionProvider>
