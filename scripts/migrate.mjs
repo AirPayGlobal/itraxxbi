@@ -78,8 +78,13 @@ try {
   const applied = new Set(rows.map((r) => r.version));
   const versionOf = (f) => f.slice(0, 14);
 
+  // Brand-new, empty database (e.g. a demo site): nothing to baseline, apply every migration.
+  const { rows: hasProfiles } = await client.query("select to_regclass('public.profiles') as t");
+  const freshDatabase = !hasProfiles[0].t;
+  if (freshDatabase) console.log("[migrate] Empty database: applying all migrations from scratch.");
+
   // First run: earlier migrations were pasted into the SQL Editor, so record them rather than re-run them.
-  if (!files.some((f) => applied.has(versionOf(f)))) {
+  if (!freshDatabase && !files.some((f) => applied.has(versionOf(f)))) {
     const { rows: check } = await client.query(
       `select 1 from information_schema.columns
        where table_schema = 'public' and table_name = 'profiles' and column_name = 'clerk_user_id'`
@@ -120,6 +125,26 @@ try {
       throw new Error(`${f} failed: ${err.message}`);
     }
     console.log(`[migrate] Applied ${f}.`);
+  }
+
+  // Demo site only: load sample data into an empty database.
+  if (process.env.DEMO_MODE === "1") {
+    const { rows: c } = await client.query("select count(*)::int as n from public.customers");
+    if (c[0].n === 0) {
+      console.log("[migrate] DEMO_MODE: loading demo data ...");
+      const seed = await readFile(path.join(process.cwd(), "supabase", "demo", "seed.sql"), "utf8");
+      await client.query("begin");
+      try {
+        await client.query(seed);
+        await client.query("commit");
+      } catch (err) {
+        await client.query("rollback").catch(() => {});
+        throw new Error(`demo seed failed: ${err.message}`);
+      }
+      console.log("[migrate] Demo data loaded.");
+    } else {
+      console.log("[migrate] DEMO_MODE: data already present, not reseeding.");
+    }
   }
 } catch (err) {
   console.error(`[migrate] ${err.message}`);

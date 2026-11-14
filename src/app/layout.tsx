@@ -5,6 +5,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import AuthSessionProvider from "@/components/providers/session-provider";
 import QueryProvider from "@/components/providers/query-provider";
 import "./globals.css";
+import { DemoBanner } from "@/components/demo-banner";
 
 // Self-hosted from npm so builds don't depend on reaching Google Fonts.
 const inter = localFont({
@@ -56,6 +57,7 @@ export default function RootLayout({
             elements: { socialButtonsRoot: { display: "none" }, dividerRow: { display: "none" } },
           }}
         >
+        <DemoBanner />
         <AuthSessionProvider>
         <QueryProvider>
         {children}

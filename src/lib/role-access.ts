@@ -1,3 +1,5 @@
+import { DEMO_MODE } from "@/lib/demo";
+
 export const roleAccess: Record<string, string[]> = {
   ADMIN: [
     "/", "/projects", "/tasks", "/jobcards", "/inspections", "/tickets",
@@ -18,9 +20,14 @@ export const roleAccess: Record<string, string[]> = {
   STAFF: [
     "/", "/tasks", "/tickets", "/documents", "/hr", "/my-portal",
   ],
-  VIEWER: [
-    "/", "/projects", "/tasks", "/jobcards", "/customers", "/finance",
-  ],
+  // On the demo site the read-only login can look at every module (it still can't change anything:
+  // the database refuses VIEWER writes). Settings stays closed so nobody can change the shared login.
+  VIEWER: DEMO_MODE
+    ? [
+        "/", "/projects", "/tasks", "/jobcards", "/inspections", "/tickets", "/customers", "/customer-onboarding",
+        "/staff", "/hr", "/documents", "/inventory", "/finance", "/sales-pipeline", "/meeting-ai", "/traxx",
+      ]
+    : ["/", "/projects", "/tasks", "/jobcards", "/customers", "/finance"],
   CLIENT: ["/portal"],
 };
 
