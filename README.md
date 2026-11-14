@@ -183,3 +183,16 @@ The schema lives in `supabase/migrations/` (combined into `supabase/apply_all_mi
 ## Demo users (local only)
 
 `supabase/seed.sql` creates five demo **profiles** on `supabase db reset` (`admin@`, `manager@`, `technician@`, `staff@`, `viewer@itrackerx.com`). They have no passwords: invite an email in your Clerk development instance and sign in with it to use that profile.
+
+## Demo site
+
+A separate deployment with its own Supabase project and fictional sample data. The live app and its data are never touched.
+
+- **Turning it on:** set `NEXT_PUBLIC_DEMO_MODE=1` and `DEMO_MODE=1` on the demo Vercel project. This shows a "Demo site" banner, lists the demo logins on the sign-in page, and lets the read-only VIEWER login open every module except Settings and Payslips.
+- **First deploy:** `scripts/migrate.mjs` applies all migrations to the empty demo database, then loads `supabase/demo/seed.sql`. That file holds 12 fictional customers plus vehicles, job cards, inspections, tickets, invoices, payments, expenses, deals, payslips and a debtors report, with dates relative to the deploy. Later deploys never re-seed.
+- **Demo logins** (Clerk users in the shared production instance, with profiles only in the demo database):
+  - `demo@sinapsedi.com`: VIEWER, read-only
+  - `demo.client@sinapsedi.com`: CLIENT for "Kalahari Freight Lines"
+  - The shared password is set via `NEXT_PUBLIC_DEMO_PASSWORD` on the demo project only.
+- **Reset the demo:** empty the demo database's tables (or create a fresh Supabase project) and redeploy.
+

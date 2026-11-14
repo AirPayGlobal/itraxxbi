@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { DEMO_LOGINS, DEMO_PASSWORD } from "@/lib/demo";
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -59,6 +60,24 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
           <div className="mb-8 flex justify-center lg:hidden">
             <img src="/brand/itrackerx-logo.png" alt="iTrackerX — Fleet Data Intelligence" className="h-12 w-auto" />
           </div>
+
+          {DEMO_LOGINS.length > 0 && (
+            <div className="mb-6 w-full rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+              <p className="mb-2 font-semibold">Try the demo</p>
+              <ul className="space-y-1">
+                {DEMO_LOGINS.map((l) => (
+                  <li key={l.email}>
+                    <span className="text-amber-700">{l.label}:</span> <span className="font-mono">{l.email}</span>
+                  </li>
+                ))}
+              </ul>
+              {DEMO_PASSWORD && (
+                <p className="mt-2">
+                  <span className="text-amber-700">Password:</span> <span className="font-mono">{DEMO_PASSWORD}</span>
+                </p>
+              )}
+            </div>
+          )}
 
           {title && (
             <div className="mb-8">
