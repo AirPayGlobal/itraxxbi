@@ -168,12 +168,7 @@ export default function DashboardPage() {
         <KpiCard
           index={3}
           title="Revenue (Paid)"
-          value={new Intl.NumberFormat("en-NA", {
-            style: "currency",
-            currency: "NAD",
-            currencyDisplay: "narrowSymbol",
-            maximumFractionDigits: 0,
-          }).format(paidRevenue)}
+          value={`N$${Math.round(paidRevenue).toLocaleString("en-NA")}`}
           changeLabel="Paid invoices to date"
           icon={<DollarSign className="h-5 w-5 text-amber-600" />}
           color="bg-amber-100"
