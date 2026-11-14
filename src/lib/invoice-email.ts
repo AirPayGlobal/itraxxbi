@@ -1,3 +1,4 @@
+import { formatCurrency } from "@/lib/utils";
 import type {
   InvoiceRow,
   InvoiceItemRow,
@@ -12,11 +13,8 @@ function esc(v: unknown): string {
 }
 
 function money(n: number): string {
-  return new Intl.NumberFormat("en-NA", {
-    style: "currency",
-    currency: "NAD",
-    currencyDisplay: "narrowSymbol",
-  }).format(n ?? 0);
+  // Written out as "N$": the narrow symbol for NAD renders as a bare "$".
+  return formatCurrency(n ?? 0);
 }
 
 function fmtDate(d: string | null): string {
